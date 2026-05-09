@@ -1761,6 +1761,17 @@ async def multi_dashboard(request):
     
     return web.Response(text=rendered_html, content_type='text/html', headers=NO_CACHE_HEADERS)
 
+async def mdguard_dashboard(request):
+    """Serve the redesigned MDGuard industrial-HMI dashboard."""
+    if not mdguard_dashboard_template:
+        return web.Response(text="Template not loaded", status=500)
+    config = load_forrixguard_config() or {}
+    site = (config.get('site') or {})
+    rendered_html = mdguard_dashboard_template.render(
+        site_name=site.get('name', 'Site'),
+    )
+    return web.Response(text=rendered_html, content_type='text/html', headers=NO_CACHE_HEADERS)
+
 async def phase_power_comparison(request):
     return web.Response(text=phase_power_comparison_template.render(), content_type='text/html', headers=NO_CACHE_HEADERS)
 
