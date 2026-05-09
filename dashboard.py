@@ -469,6 +469,7 @@ time_slots_template = None
 forrixguard_setup_template = None
 login_template = None
 monthly_report_template = None
+mdguard_dashboard_template = None
 
 # Load device ID from ForrixGuard config
 try:
@@ -3564,6 +3565,8 @@ async def startup(app):
         forrixguard_setup_template = env.get_template('forrixguard_setup.html')
         login_template = env.get_template('login.html')
         monthly_report_template = env.get_template('monthly_report.html')
+        global mdguard_dashboard_template
+        mdguard_dashboard_template = env.get_template('mdguard_dashboard.html')
 
         logger.info("Templates loaded and compiled with context-aware autoescape")
     except Exception as e:
@@ -4096,7 +4099,8 @@ if __name__ == '__main__':
     app.router.add_get('/api/user-info', api_user_info)  # Alias for template compatibility
 
     # Redirect / to /multi as home landing page
-    app.router.add_get('/', multi_dashboard)
+    app.router.add_get('/', mdguard_dashboard)
+    app.router.add_get('/mdguard', mdguard_dashboard)
     app.router.add_get('/multi', multi_dashboard)
     app.router.add_get('/phase-power-comparison', phase_power_comparison)
     app.router.add_get('/power-time-settings', time_slots_dashboard)
