@@ -4,7 +4,15 @@
 
 ---
 
-Design a **professional industrial energy management dashboard** for **MDGuard by ForrixGuard** — a maximum-demand intelligence platform for C&I (commercial & industrial) sites in India and the GCC region. The product sits between existing hardware (grid meters, solar inverters, BESS/battery systems, DG sets) and the site operator, providing demand prediction, tariff-aware BESS dispatch, and ROI reporting.
+Design a **professional industrial energy management dashboard** for **MDGuard by ForrixGuard** — a maximum-demand intelligence platform for C&I (commercial & industrial) sites in India and the GCC region.
+
+MDGuard is the **middle intelligence layer**, not a replacement for meter, inverter, BESS, DG, or PLC controllers. It sits between existing site hardware and the operator:
+
+Existing grid meter / solar inverter / BESS PCS + BMS / DG / loads  
+→ **MDGuard intelligence**  
+→ demand prediction, advisory BESS dispatch recommendations, tariff/ROI reporting, and audit-ready event proof.
+
+The UI must communicate **recommendation-first safety**: MDGuard can advise and explain actions in monitor-only deployments. Closed-loop control must appear as disabled unless explicitly enabled by site configuration.
 
 ---
 
@@ -21,6 +29,7 @@ They do **not** care about phase-level details or raw telemetry during normal op
 3. Is my BESS ready to protect me if demand spikes?
 4. How much has MDGuard saved me this month vs. what I would have paid in penalties?
 5. Is solar contributing or is everything coming from the grid?
+6. If there is a peak risk, why is it happening and what should I do first?
 
 ---
 
@@ -32,6 +41,7 @@ They do **not** care about phase-level details or raw telemetry during normal op
 - **Zero noise**: Phase-level detail (V, I, PF per phase) belongs behind a "Technical Detail" expand toggle — never visible by default.
 - **ISA-101 / IEC 61511 industrial HMI principles**: Muted dark background, high-contrast value display, consistent color semantics, clear alarm hierarchy.
 - **Confidence, not decoration**: Cards feel solid and measured — no glassmorphism blur, no animated value counters, no gradient fills on data.
+- **Advice is not control**: Recommendations must be visually distinct from commands. Default state is "Advisory only"; never imply MDGuard directly controls BESS/load shedding unless the control mode says enabled.
 
 ---
 
@@ -109,6 +119,7 @@ The single most important card on the page. Cannot be missed.
 - Badge: "DEMAND SAFE" / "CAUTION" / "BREACH RISK" — large, color-filled, full header width
 - Breach active: card border pulses red; amber action banner appears below with BESS recommendation
 - Remove from this view: raw event cause labels, "Recommendation: monitor" text, telemetry staleness text (reduce to a small dot indicator in card corner)
+- When there is no action needed, do **not** show a generic recommendation row. When action is needed, show one plain-English advisory line, for example: "Recommended: discharge 89 kW from BESS or reduce import. Advisory only."
 
 #### LEFT COLUMN — Site Power Flow Card (below demand card)
 
@@ -159,6 +170,8 @@ Breach cost if hit now      ₹28,000
 ```
 Green for savings. Red for cost exposure. Hidden if tariff not configured — show "Configure tariff → Setup" link instead.
 
+Savings language should be report-ready but honest: if tariff rates are not configured, show kW opportunity and "Tariff not configured" rather than inventing rupee/AED savings.
+
 **R4 — DG Status** (shown only when DG is configured)
 ```
 🔧 DG 1                     ● IDLE
@@ -197,6 +210,11 @@ Phase-level data is **never visible on the main dashboard** — only accessible 
 - 🟡 Amber: "CAUTION — Demand at 87% of sanctioned limit. Monitoring closely."
 - 🟢 Green (5s auto-dismiss): "BESS dispatch applied — 89 kW discharge for 8 minutes."
 
+If control mode is monitor-only, wording must say:
+- "Recommended: discharge 89 kW from BESS. Advisory only."
+
+Only use "applied" / "command sent" language when control mode is enabled.
+
 **Toast stack** (bottom-right): icon + short text, 4s auto-dismiss.
 
 ---
@@ -214,6 +232,15 @@ Bar colors: green = safe, amber = caution, red = breach.
 
 **Events table**: Date & Time | Peak Demand | Status | BESS Action  
 Plain English descriptions — no raw event codes.
+
+Every peak/risk row should explain **why**:
+- Load step increase
+- Solar shortfall
+- BESS unavailable
+- BESS support active
+- DG started
+- Telemetry gap
+- Load rise
 
 **Navigation**: `← March 2026 →` with Export to PDF / CSV button.
 
@@ -249,6 +276,28 @@ Tabs: `Site & Contract` | `Tariff & Rates` | `Device Roles` | `System`
 8. **NavigationBar** — Fixed top bar with site name, connection dot, timestamp
 9. **MonthlyReportPage** — Hero metrics + daily chart + plain-English events table
 10. **SetupPage** — Tabbed commissioning form with live preview and device status strip
+11. **AdvisoryActionStrip** — Only visible when action is needed; shows reason, recommended kW, control mode, and safety note.
+12. **TelemetryFreshnessDot** — Small status indicator for grid meter freshness; expands to detail only on hover/click.
+
+---
+
+### DATA FIELDS TO DESIGN AROUND
+
+Use friendly labels, not raw field names. The current MDGuard backend exposes these concepts:
+
+| Backend concept | UI label |
+|---|---|
+| `current_kw` | Current demand |
+| `projected_kw` | Projected demand |
+| `allowed_kw` | Allowed demand |
+| `correction_kw` / `recommendation_kw` | Correction needed |
+| `event_cause` | Why this is happening |
+| `telemetry_fresh`, `telemetry_age_sec` | Meter data health |
+| `savings_opportunity_kw` | Savings opportunity |
+| `estimated_penalty_kw` | Penalty exposure |
+| `control_command_allowed` | Control mode |
+
+`control_command_allowed = false` means every action must be displayed as advisory only.
 
 ---
 
