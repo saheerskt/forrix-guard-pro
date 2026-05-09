@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  /* Surfaces — deep navy industrial HMI per dashboard-plan.md */
+  --color-bg: #0a0f1e;
+  --color-surface: #111827;
+  --color-surface-2: #0f1626;
+  --color-surface-3: #1a2236;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --color-text: #f1f5f9;
+  --color-text-dim: #94a3b8;
+  --color-label: #64748b;
+
+  /* Status / brand */
+  --color-cyan: #06b6d4;
+  --color-good: #10b981;
+  --color-warn: #f59e0b;
+  --color-bad: #ef4444;
+  --color-purple: #a855f7;
+  --color-yellow: #fbbf24;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------- Status pulse for breach card ------- */
+@keyframes mg-pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.25); }
+}
+.mg-pulse { animation: mg-pulse-red 1.6s ease-in-out infinite; }
+
+/* Mono numerics */
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Reusable card primitive */
+.mg-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 6px 24px rgba(0,0,0,0.35);
+}
+
+.mg-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-label);
+  font-weight: 600;
+}
+
+/* Custom scrollbar for device strip */
+.mg-scroll::-webkit-scrollbar { height: 6px; }
+.mg-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 4px;
+}
