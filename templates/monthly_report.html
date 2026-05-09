@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Proof Report</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ APP_VERSION }}">
+</head>
+<body class="theme-dark">
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    <div class="container">
+        <header class="dashboard-header">
+            <div class="dashboard-title">
+                <div class="title-group">
+                    <h1>Monthly Proof Report</h1>
+                    <div class="device-id">
+                        <i class="fa-solid fa-file-chart-column"></i>
+                        <span>Demand, actions, and proof records</span>
+                    </div>
+                </div>
+            </div>
+            <nav class="nav-bar">
+                <a href="/multi" class="nav-btn">
+                    <i class="fa-solid fa-grip"></i> Dashboard
+                </a>
+                <a href="/phase-power-comparison" class="nav-btn">
+                    <i class="fa-solid fa-chart-line"></i> Power Plots
+                </a>
+                <a href="/power-time-settings" class="nav-btn">
+                    <i class="fa-regular fa-clock"></i> Power Settings
+                </a>
+                <a href="/monthly-report" class="nav-btn active">
+                    <i class="fa-solid fa-file-invoice"></i> Monthly Report
+                </a>
+                <a href="/forrixguard-setup" class="nav-btn">
+                    <i class="fa-solid fa-sliders"></i> ForrixGuard Setup
+                </a>
+                <div class="user-profile-badge"
+                    style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem; margin-right: 1rem; padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid var(--border-color);">
+                    <i class="fa-solid fa-user-circle" id="user-role-icon" style="color: var(--accent-cyan);"></i>
+                    <span id="user-display-name"
+                        style="font-size: 0.85rem; font-weight: 500; color: var(--text-primary);">...</span>
+                </div>
+                <button id="logout-btn" class="nav-btn"
+                    style="color: var(--accent-red); border-color: rgba(220, 38, 38, 0.3); background: rgba(220, 38, 38, 0.1);">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </nav>
+        </header>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <span id="connection-status" class="status-indicator status-offline">System Offline</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="report-content">
+            <!-- Month navigation -->
+            <div class="month-nav">
+                <button id="btn-prev"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                <span class="month-label" id="month-label">Loading...</span>
+                <button id="btn-next">Next <i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+
+            <div class="report-toolbar">
+                <button id="btn-export-csv" class="nav-btn" type="button">
+                    <i class="fa-solid fa-table"></i> Export Spreadsheet
+                </button>
+                <button id="btn-export-json" class="nav-btn" type="button">
+                    <i class="fa-solid fa-database"></i> Export Raw Data
+                </button>
+                <button id="btn-print-report" class="nav-btn" type="button">
+                    <i class="fa-solid fa-print"></i> Print / PDF
+                </button>
+            </div>
+
+            <!-- Summary cards -->
+            <div class="report-summary-grid" id="summary-grid">
+                <div class="summary-card peak">
+                    <div class="s-label">Monthly Peak</div>
+                    <div><span class="s-value" id="s-peak">--</span><span class="s-unit">kW</span></div>
+                </div>
+                <div class="summary-card">
+                    <div class="s-label">Sanctioned</div>
+                    <div><span class="s-value" id="s-sanctioned">--</span><span class="s-unit">kW</span></div>
+                </div>
+                <div class="summary-card ok">
+                    <div class="s-label">Allowed (95%)</div>
+                    <div><span class="s-value" id="s-allowed">--</span><span class="s-unit">kW</span></div>
+                </div>
+                <div class="summary-card breach">
+                    <div class="s-label">Breach Events</div>
+                    <div><span class="s-value" id="s-breaches">--</span></div>
+                </div>
+                <div class="summary-card">
+                    <div class="s-label">Demand Windows</div>
+                    <div><span class="s-value" id="s-windows">--</span></div>
+                </div>
+                <div class="summary-card">
+                    <div class="s-label">Max Correction</div>
+                    <div><span class="s-value" id="s-correction">--</span><span class="s-unit">kW</span></div>
+                </div>
+                <div class="summary-card">
+                    <div class="s-label">Proof Events</div>
+                    <div><span class="s-value" id="s-proof-events">--</span></div>
+                </div>
+                <div class="summary-card ok">
+                    <div class="s-label">Load Shed Avoided</div>
+                    <div><span class="s-value" id="s-avoided">--</span></div>
+                </div>
+                <div class="summary-card">
+                    <div class="s-label">BESS Actions</div>
+                    <div><span class="s-value" id="s-bess-actions">--</span></div>
+                </div>
+                <div class="summary-card">
+                    <div class="s-label">DG Runtime</div>
+                    <div><span class="s-value" id="s-dg-runtime">--</span><span class="s-unit">min</span></div>
+                </div>
+                <div class="summary-card">
+                    <div class="s-label">Total Correction</div>
+                    <div><span class="s-value" id="s-total-correction">--</span><span class="s-unit">kW</span></div>
+                </div>
+                <div class="summary-card">
+                    <div class="s-label">Meter Issues</div>
+                    <div><span class="s-value" id="s-meter-events-card">--</span></div>
+                </div>
+            </div>
+
+            <div class="card report-proof-summary">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-clipboard-check card-icon icon-demand"></i>
+                        <span>Proof Summary</span>
+                    </div>
+                </div>
+                <div class="proof-summary-grid">
+                    <div class="proof-summary-main">
+                        <span class="s-label">Missed Opportunity</span>
+                        <div id="s-missed-summary" class="proof-chip-list">
+                            <span class="proof-chip muted">--</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="s-label">Solar Events</span>
+                        <strong id="s-solar-events">--</strong>
+                    </div>
+                    <div>
+                        <span class="s-label">Meter Comms</span>
+                        <strong id="s-meter-events">--</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Site & Infrastructure panel -->
+            <div class="report-infra-panel" id="infra-panel" style="display:none; margin-bottom:1.5rem;">
+                <div class="report-infra-title">
+                    <i class="fa-solid fa-building-columns"></i> Site &amp; Infrastructure
+                </div>
+                <div class="report-infra-grid">
+                    <div class="report-infra-section">
+                        <div class="group-title">Site Contract</div>
+                        <div class="data-row"><span class="label">Customer</span><span id="ri-customer" class="value">--</span></div>
+                        <div class="data-row"><span class="label">Market</span><span id="ri-market" class="value">--</span></div>
+                        <div class="data-row"><span class="label">Tariff Category</span><span id="ri-tariff" class="value">--</span></div>
+                        <div class="data-row"><span class="label">Sanctioned Demand</span><span id="ri-sanctioned" class="value">--</span><span class="unit">kW</span></div>
+                        <div class="data-row"><span class="label">Demand Window</span><span id="ri-window" class="value">--</span><span class="unit">min</span></div>
+                        <div class="data-row"><span class="label">Safety Margin</span><span id="ri-margin" class="value">--</span></div>
+                        <div class="data-row"><span class="label">SOC Reserve</span><span id="ri-soc" class="value">--</span><span class="unit">%</span></div>
+                        <div class="data-row"><span class="label">Control Mode</span><span id="ri-mode" class="value">--</span></div>
+                    </div>
+                    <div class="report-infra-section">
+                        <div class="group-title">Connected Devices</div>
+                        <div id="ri-devices" class="report-infra-devices"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Event table -->
+            <div id="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading report...</div>
+            <div class="events-table-wrap" id="table-wrap" style="display:none;">
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th>Window Closed (UTC)</th>
+                            <th>Final Demand (kW)</th>
+                            <th>Allowed (kW)</th>
+                            <th>Correction (kW)</th>
+                            <th>Breach</th>
+                        </tr>
+                    </thead>
+                    <tbody id="events-tbody"></tbody>
+                </table>
+            </div>
+            <div class="empty-state" id="empty-state" style="display:none;">
+                <i class="fa-solid fa-inbox"></i>
+                No demand window records found for this month.<br>
+                Records are stored each time a 15/30-minute demand window closes.
+            </div>
+
+            <div class="events-table-wrap" id="proof-table-wrap" style="display:none; margin-top: 1.5rem;">
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th>Proof Event (UTC)</th>
+                            <th>Code</th>
+                            <th>Action</th>
+                            <th>Result</th>
+                            <th>Correction</th>
+                        </tr>
+                    </thead>
+                    <tbody id="proof-events-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/jquery-3.6.0.min.js"></script>
+    <script>
+    (function () {
+        const now = new Date();
+        let year = now.getFullYear();
+        let month = now.getMonth() + 1; // 1-based
+
+        function valueOrDash(value) {
+            return value === null || value === undefined || value === '' ? '--' : value;
+        }
+
+        function escapeHtml(value) {
+            const text = value === null || value === undefined ? '' : value;
+            return String(text).replace(/[&<>"']/g, ch => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            }[ch]));
+        }
+
+        function eventDisplayLabel(code) {
+            const labels = {
+                DEMO_SCENARIO_STARTED: 'Demo Started',
+                DEMAND_RISING: 'Demand Rising',
+                DEMAND_BREACH_RISK: 'Peak Risk Warning',
+                DEMAND_RISK_CLEAR: 'Peak Risk Cleared',
+                DEMAND_WINDOW_CLOSED: 'Demand Window Closed',
+                DEMAND_WINDOW_BREACHED: 'Demand Window Breached',
+                BESS_DISPATCHED: 'Battery Support Started',
+                DG_STARTED: 'DG Runtime Logged',
+                LOAD_SHED_AVOIDED: 'Load Shedding Avoided',
+                METER_COMM_LOST: 'Meter Communication Lost',
+                SOLAR_UNDERPERFORMANCE: 'Solar Underperformance'
+            };
+            if (labels[code]) return labels[code];
+            return String(code || 'Event').toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
+        }
+
+        function renderMissedOpportunity(summary) {
+            const container = document.getElementById('s-missed-summary');
+            const items = [];
+            const solar = Number(summary.solar_underperformance_count || 0);
+            const meter = Number(summary.meter_comm_lost_count || 0);
+            const breach = Number(summary.breach_count || 0);
+
+            if (solar > 0) items.push({ label: 'Solar underperformance', value: solar, tone: 'warning' });
+            if (meter > 0) items.push({ label: 'Meter communication loss', value: meter, tone: 'warning' });
+            if (breach > 0) items.push({ label: 'Demand breach window', value: breach, tone: 'critical' });
+
+            if (items.length === 0) {
+                container.innerHTML = '<span class="proof-chip ok">No missed opportunities recorded</span>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => `
+                <span class="proof-chip ${item.tone}">
+                    <strong>${item.value}</strong>
+                    ${escapeHtml(item.label)}
+                </span>
+            `).join('');
+        }
+
+        function reportApiUrl(format) {
+            const base = `/api/monthly-report?year=${year}&month=${month}`;
+            return format ? `${base}&format=${encodeURIComponent(format)}` : base;
+        }
+
+        function updateExportButtons() {
+            document.getElementById('btn-export-csv').onclick = () => {
+                window.location.href = reportApiUrl('csv');
+            };
+            document.getElementById('btn-export-json').onclick = () => {
+                window.location.href = reportApiUrl('json');
+            };
+            document.getElementById('btn-print-report').onclick = () => {
+                window.print();
+            };
+        }
+
+        function loadReport() {
+            document.getElementById('loading-spinner').style.display = 'block';
+            document.getElementById('table-wrap').style.display = 'none';
+            document.getElementById('proof-table-wrap').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'none';
+
+            updateExportButtons();
+
+            fetch(reportApiUrl())
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('loading-spinner').style.display = 'none';
+                    const s = data.summary;
+                    document.getElementById('month-label').textContent = s.month_label || '--';
+                    document.getElementById('s-peak').textContent       = s.monthly_peak_kw ?? '--';
+                    document.getElementById('s-sanctioned').textContent = s.sanctioned_kw ?? '--';
+                    document.getElementById('s-allowed').textContent    = s.allowed_kw ?? '--';
+                    document.getElementById('s-breaches').textContent   = s.breach_count ?? '--';
+                    document.getElementById('s-windows').textContent    = s.total_windows ?? '--';
+                    document.getElementById('s-correction').textContent = s.max_correction_kw ?? '--';
+                    document.getElementById('s-proof-events').textContent = valueOrDash(s.event_count);
+                    document.getElementById('s-avoided').textContent = valueOrDash(s.avoided_breach_count);
+                    document.getElementById('s-bess-actions').textContent = valueOrDash(s.bess_action_count);
+                    document.getElementById('s-dg-runtime').textContent = valueOrDash(s.dg_runtime_min);
+                    document.getElementById('s-meter-events-card').textContent = valueOrDash(s.meter_comm_lost_count);
+                    document.getElementById('s-total-correction').textContent = valueOrDash(s.total_correction_kw);
+                    renderMissedOpportunity(s);
+                    renderSiteInfra(data.site_config);
+                    document.getElementById('s-solar-events').textContent = valueOrDash(s.solar_underperformance_count);
+                    document.getElementById('s-meter-events').textContent = valueOrDash(s.meter_comm_lost_count);
+
+                    const tbody = document.getElementById('events-tbody');
+                    tbody.innerHTML = '';
+                    if (data.events && data.events.length > 0) {
+                        // Show most recent first
+                        const sorted = data.events.slice().reverse();
+                        sorted.forEach(e => {
+                            const breach = e.breach === 1;
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${e.datetime}</td>
+                                <td class="${breach ? 'val-breach' : 'val-ok'}">${e.final_kw}</td>
+                                <td>${e.allowed_kw}</td>
+                                <td>${e.correction_kw > 0 ? e.correction_kw : '--'}</td>
+                                <td><span class="breach-badge ${breach ? 'breach-yes' : 'breach-no'}">${breach ? 'BREACH' : 'OK'}</span></td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                        document.getElementById('table-wrap').style.display = 'block';
+                    } else {
+                        document.getElementById('empty-state').style.display = 'block';
+                    }
+
+                    const proofBody = document.getElementById('proof-events-tbody');
+                    proofBody.innerHTML = '';
+                    if (data.proof_events && data.proof_events.length > 0) {
+                        data.proof_events.slice().reverse().slice(0, 40).forEach(e => {
+                            const details = e.details || {};
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${escapeHtml(e.datetime)}</td>
+                                <td>${escapeHtml(eventDisplayLabel(e.event_code))}</td>
+                                <td>${escapeHtml(details.action || e.message || '--')}</td>
+                                <td>${escapeHtml(details.result || '--')}</td>
+                                <td>${details.correction_kw > 0 ? escapeHtml(details.correction_kw) : '--'}</td>
+                            `;
+                            proofBody.appendChild(row);
+                        });
+                        document.getElementById('proof-table-wrap').style.display = 'block';
+                    }
+
+                    // Update nav state
+                    const nextNow = new Date();
+                    const isCurrentMonth = (year === nextNow.getFullYear() && month === nextNow.getMonth() + 1);
+                    document.getElementById('btn-next').disabled = isCurrentMonth;
+                    document.getElementById('btn-next').style.opacity = isCurrentMonth ? '0.4' : '1';
+                })
+                .catch(err => {
+                    document.getElementById('loading-spinner').style.display = 'none';
+                    document.getElementById('empty-state').style.display = 'block';
+                    console.error('Report fetch error:', err);
+                });
+        }
+
+        function renderSiteInfra(cfg) {
+            if (!cfg) return;
+            const panel = document.getElementById('infra-panel');
+            if (panel) panel.style.display = '';
+
+            const set = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = val !== null && val !== undefined ? val : '--';
+            };
+            const site = cfg.site || {};
+            const md = cfg.maximum_demand || {};
+            const ctrl = cfg.control || {};
+            set('ri-customer', site.customer);
+            set('ri-market', site.market);
+            set('ri-tariff', site.tariff);
+            set('ri-sanctioned', md.sanctioned_kw);
+            set('ri-window', md.window_seconds ? Math.round(md.window_seconds / 60) : '--');
+            set('ri-margin', md.safety_margin ? (md.safety_margin * 100).toFixed(0) + '%' : '--');
+            set('ri-soc', ctrl.soc_reserve_pct);
+            set('ri-mode', ctrl.mode ? ctrl.mode.replace('_', ' ') : '--');
+
+            const devContainer = document.getElementById('ri-devices');
+            if (devContainer && cfg.device_roles && cfg.device_roles.length) {
+                devContainer.innerHTML = cfg.device_roles.map(d => `
+                    <div class="report-infra-device">
+                        <strong>${escapeHtml(d.type)} — ${escapeHtml(d.model)}</strong>
+                        <span>${escapeHtml(d.role)}</span>
+                        <span style="color:var(--text-secondary); font-size:0.75rem;">${escapeHtml(d.interface)} · ${escapeHtml(d.adapter)}</span>
+                    </div>`).join('');
+            }
+        }
+
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            if (month === 1) { month = 12; year--; } else { month--; }
+            loadReport();
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            const now = new Date();
+            if (year === now.getFullYear() && month === now.getMonth() + 1) return;
+            if (month === 12) { month = 1; year++; } else { month++; }
+            loadReport();
+        });
+
+        loadReport();
+    })();
+    </script>
+    <script src="/static/js/theme.js?v={{ APP_VERSION }}"></script>
+    <script src="/static/js/main.js?v={{ APP_VERSION }}"></script>
+</body>
+</html>

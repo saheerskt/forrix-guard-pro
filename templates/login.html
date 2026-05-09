@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - ForrixGuard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            /* Base Theme (Light Mode Default for Variables) */
+            --bg-color: #f0f2f5;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --text-color: #1e293b;
+            --text-muted: #64748b;
+            --input-bg: rgba(255, 255, 255, 0.9);
+            --border-color: rgba(148, 163, 184, 0.2);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+            --giv-green: #16a34a;
+            /* Darker green for light mode contrast */
+            --giv-green-hover: #15803d;
+            --accent-color: #0891b2;
+        }
+
+        /* Dark Mode Overrides (Matching Premium Forrix Theme) */
+        body.theme-dark {
+            --bg-color: #051624;
+            --card-bg: rgba(11, 37, 58, 0.6);
+            --text-color: #F8FAFC;
+            --text-muted: #94A3B8;
+            --input-bg: rgba(0, 0, 0, 0.2);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.5);
+
+            --giv-green: #50BBA9;
+            /* Brand Teal */
+            --giv-green-hover: #3e9c8e;
+            --accent-color: #50BBA9;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            position: relative;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Ambient Dynamic Background (Control visibility via JS/CSS if desired, looks good in both) */
+        .ambient-bg {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Adjust Orbs for Light Mode if needed, or keep them subtle */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .orb-1 {
+            top: -10%;
+            left: -10%;
+            width: 600px;
+            height: 600px;
+            background: var(--accent-color);
+            /* Dynamic color */
+        }
+
+        .orb-2 {
+            bottom: -20%;
+            right: -10%;
+            width: 700px;
+            height: 700px;
+            background: var(--giv-green);
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            top: 40%;
+            left: 40%;
+            width: 400px;
+            height: 400px;
+            background: rgba(23, 37, 84, 0.5);
+            /* Deep blueish */
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            33% {
+                transform: translate(30px, -50px);
+            }
+
+            66% {
+                transform: translate(-20px, 20px);
+            }
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle-absolute {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            z-index: 50;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .theme-toggle-absolute:hover {
+            color: var(--giv-green);
+            border-color: var(--giv-green);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Login Card */
+        .login-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 3rem;
+            box-shadow: var(--shadow-lg);
+            animation: cardEnter 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        @keyframes cardEnter {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .brand-logo {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-color);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .brand-logo i {
+            color: var(--giv-green);
+        }
+
+        .login-subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 400;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .form-label {
+            position: absolute;
+            left: 1rem;
+            top: 1rem;
+            color: var(--text-muted);
+            font-size: 1rem;
+            pointer-events: none;
+            transition: all 0.2s ease;
+            background: transparent;
+            padding: 0 0.25rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 1rem 1rem 0.5rem;
+            height: 56px;
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-color);
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--giv-green);
+            background: var(--card-bg);
+            box-shadow: 0 0 0 4px rgba(80, 187, 169, 0.1);
+            /* Keep subtle tint */
+        }
+
+        /* Input Focus/Filled State Logic */
+        .form-input:focus~.form-label,
+        .form-input:not(:placeholder-shown)~.form-label {
+            top: 0.25rem;
+            left: 0.75rem;
+            font-size: 0.75rem;
+            color: var(--giv-green);
+            font-weight: 600;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 1rem;
+            margin-top: 1rem;
+            background: var(--giv-green);
+            color: white;
+            /* Always white text on green button */
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-btn:hover {
+            background: var(--giv-green-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(80, 187, 169, 0.4);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-msg {
+            margin-top: 1.5rem;
+            min-height: 1.5rem;
+            text-align: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .status-msg.error {
+            color: #ef4444;
+            opacity: 1;
+        }
+
+        .status-msg.success {
+            color: var(--giv-green);
+            opacity: 1;
+        }
+
+        /* Decoration */
+        .decor-line {
+            height: 4px;
+            width: 60px;
+            background: var(--giv-green);
+            border-radius: 2px;
+            margin: 0 auto 2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    
+    <!-- Theme Toggle Button -->
+    <button id="login-theme-btn" class="theme-toggle-absolute" onclick="window.toggleTheme()" title="Toggle Theme">
+        <i id="login-theme-icon" class="fa-solid fa-moon"></i>
+    </button>
+
+    <div class="login-card">
+        <div class="login-header">
+            <div class="brand-logo">
+                <i class="fa-solid fa-bolt"></i> Forrix
+            </div>
+            <div class="decor-line"></div>
+            <p class="login-subtitle">Energy Management System</p>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <input type="text" id="username" class="form-input" placeholder=" " required autofocus>
+                <label class="form-label" for="username">Username</label>
+            </div>
+
+            <div class="form-group">
+                <input type="password" id="password" class="form-input" placeholder=" " required>
+                <label class="form-label" for="password">Password</label>
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">
+                Sign In
+            </button>
+            <div id="statusMsg" class="status-msg"></div>
+        </form>
+    </div>
+
+    <script src="/static/js/theme.js"></script>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const btn = document.getElementById('loginBtn');
+            const statusBox = document.getElementById('statusMsg');
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) return;
+
+            // UI Loading State
+            btn.disabled = true;
+            const originalText = btn.innerText;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Authenticating...';
+            statusBox.className = 'status-msg';
+            statusBox.textContent = '';
+
+            try {
+                // Delay slightly for effect (optional, removes "flicker" on super fast local networks)
+                await new Promise(r => setTimeout(r, 600));
+
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    statusBox.textContent = 'Success! Redirecting...';
+                    statusBox.classList.add('success');
+                    window.location.href = '/multi';
+                } else {
+                    statusBox.textContent = data.message || 'Invalid credentials';
+                    statusBox.classList.add('error');
+                    resetBtn();
+                }
+            } catch (err) {
+                statusBox.textContent = 'Connection failed. Please try again.';
+                statusBox.classList.add('error');
+                resetBtn();
+            }
+
+            function resetBtn() {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        });
+    </script>
+</body>
+
+</html>

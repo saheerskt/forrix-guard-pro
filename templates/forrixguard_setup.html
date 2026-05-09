@@ -1,0 +1,2167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForrixGuard Setup & Configuration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ APP_VERSION }}">
+    <style>
+        .password-input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color 0.2s;
+            padding: 0.5rem;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .password-toggle:hover {
+            color: var(--accent-cyan);
+        }
+
+        .validation-hint {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            margin-top: 0.3rem;
+            padding-left: 0.1rem;
+            opacity: 0.8;
+            line-height: 1.3;
+        }
+
+        .dots-container {
+            display: inline-block;
+            width: 2rem;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body class="theme-dark">
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    <div class="container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="dashboard-title">
+                <div class="title-group">
+                    <h1>ForrixGuard Setup & Configuration</h1>
+                    <div class="device-id">
+                        <i class="fa-solid fa-server"></i>
+                        <span id="currentDevice">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="nav-bar">
+                <a href="/multi" class="nav-btn">
+                    <i class="fa-solid fa-grip"></i> Dashboard
+                </a>
+                <a href="/phase-power-comparison" class="nav-btn">
+                    <i class="fa-solid fa-chart-line"></i> Power Plots
+                </a>
+                <a href="/power-time-settings" class="nav-btn">
+                    <i class="fa-regular fa-clock"></i> Power Settings
+                </a>
+                <a href="/monthly-report" class="nav-btn">
+                    <i class="fa-solid fa-file-invoice"></i> Monthly Report
+                </a>
+                <a href="/forrixguard-setup" class="nav-btn active">
+                    <i class="fa-solid fa-sliders"></i> ForrixGuard Setup
+                </a>
+                <div class="user-profile-badge"
+                    style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem; margin-right: 1rem; padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid var(--border-color);">
+                    <i class="fa-solid fa-user-circle" id="user-role-icon" style="color: var(--accent-cyan);"></i>
+                    <span id="user-display-name"
+                        style="font-size: 0.85rem; font-weight: 500; color: var(--text-primary);">...</span>
+                </div>
+                <button id="logout-btn" class="nav-btn"
+                    style="color: var(--accent-red); border-color: rgba(220, 38, 38, 0.3); background: rgba(220, 38, 38, 0.1);">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </nav>
+        </header>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <span id="connection-status" class="status-indicator status-offline">System Offline</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Top Row: Settings Grid (Wi-Fi, Log On, ForrixGuard Service, System Power, ForrixGuard Config) -->
+            <div
+                style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1.5rem;">
+                <!-- Wi-Fi Setup Summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title" style="white-space: nowrap;">
+                            <i class="fa-solid fa-wifi card-icon" style="color: var(--accent-green);"></i>
+                            <span>Wi-Fi Setup</span>
+                        </div>
+                        <span class="label" id="wifi-status-badge"></span>
+                    </div>
+                    <div
+                        style="padding: 0.5rem 0; text-align: center; display: flex; flex-direction: column; gap: 0.5rem; align-items: center;">
+                        <button class="nav-btn" onclick="openWifiModal()"
+                            style="width: 33%; min-width: 200px; justify-content: center; background: rgba(80, 187, 169, 0.1); color: var(--giv-green); border-color: var(--giv-green);">
+                            <i class="fa-solid fa-gear"></i> Configure Wi-Fi
+                        </button>
+                        <div id="wifi-card-static-btn-container" style="display: none; width: 33%; min-width: 200px;">
+                            <button id="wifi-card-make-static-btn" class="nav-btn" onclick="makeWifiStaticCard()"
+                                style="width: 100%; justify-content: center; background: rgba(245, 158, 11, 0.1); color: var(--accent-amber); border-color: var(--accent-amber); font-size: 0.85rem; padding: 0.4rem;">
+                                <i class="fa-solid fa-thumbtack"></i> Convert to Static IP
+                            </button>
+                        </div>
+                        <div id="wifi-card-dhcp-btn-container" style="display: none; width: 33%; min-width: 200px;">
+                            <button id="wifi-card-make-dhcp-btn" class="nav-btn" onclick="makeWifiDhcpCard()"
+                                style="width: 100%; justify-content: center; background: rgba(80, 187, 169, 0.1); color: var(--accent-green); border-color: var(--accent-green); font-size: 0.85rem; padding: 0.4rem;">
+                                <i class="fa-solid fa-rotate"></i> Convert to DHCP
+                            </button>
+                        </div>
+                        <div id="wifi-card-static-msg" style="font-size: 0.75rem; text-align: center; display: none;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Settings Summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title" style="white-space: nowrap;">
+                            <i class="fa-solid fa-shield-halved card-icon" style="color: var(--accent-red);"></i>
+                            <span>Log On</span>
+                        </div>
+                        <span class="info-value" id="log-on-user" style="color: var(--accent-green);">--</span>
+                    </div>
+                    <div style="padding: 0.5rem 0; text-align: center;">
+                        <button class="nav-btn" onclick="openSecurityModal()"
+                            style="width: 33%; min-width: 200px; justify-content: center; background: rgba(220, 38, 38, 0.1); color: var(--accent-red); border-color: var(--accent-red);">
+                            <i class="fa-solid fa-user-shield"></i> Change Password
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ForrixGuard Service Control -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title" style="white-space: nowrap;">
+                            <i class="fa-solid fa-server card-icon" style="color: var(--accent-amber);"></i>
+                            <span>ForrixGuard Service</span>
+                        </div>
+                        <span class="info-value" id="sys-status" style="color: var(--text-secondary);">--</span>
+                    </div>
+                    <div
+                        style="padding: 0.5rem 0; text-align: center; display: flex; flex-direction: column; gap: 0.5rem; align-items: center;">
+
+                        <button class="nav-btn" onclick="restartEmsApp()" id="btn-restart-app"
+                            style="width: 33%; min-width: 200px; justify-content: center; background: rgba(245, 158, 11, 0.1); color: var(--accent-amber); border-color: var(--accent-amber);">
+                            <i class="fa-solid fa-rotate"></i> Restart ForrixGuard App
+                        </button>
+                    </div>
+                </div>
+
+                <!-- System Reboot Control -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title" style="white-space: nowrap;">
+                            <i class="fa-solid fa-power-off card-icon" style="color: var(--accent-red);"></i>
+                            <span>System Power</span>
+                        </div>
+                        <span class="info-value" style="color: var(--text-secondary);">Reboot</span>
+                    </div>
+                    <div
+                        style="padding: 0.5rem 0; text-align: center; display: flex; flex-direction: column; gap: 0.5rem; align-items: center;">
+                        <button class="nav-btn" onclick="rebootSystem()" id="btn-reboot-sys"
+                            style="width: 33%; min-width: 200px; justify-content: center; background: rgba(220, 38, 38, 0.1); color: var(--accent-red); border-color: var(--accent-red);">
+                            <i class="fa-solid fa-power-off"></i> Reboot System
+                        </button>
+                        <div id="reboot-sys-msg"
+                            style="font-size: 0.75rem; text-align: center; color: var(--text-secondary); max-width: 80%; display: none;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ForrixGuard Configuration Upload (Admin Only) -->
+                <div class="card" id="forrixguard-config-card" style="display: none; padding-bottom: 0.5rem;">
+                    <div class="card-header">
+                        <div class="card-title"
+                            style="white-space: nowrap; display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fa-solid fa-file-code card-icon" style="color: var(--accent-cyan);"></i>
+                                <span>ForrixGuard Configuration</span>
+                            </div>
+                            <i class="fa-solid fa-circle-info"
+                                style="font-size: 1.1rem; color: var(--text-secondary); cursor: pointer;"
+                                onclick="openHelpModal()" title="Click for help info"></i>
+                        </div>
+                    </div>
+                    <div
+                        style="padding: 0.5rem 1.5rem; display: flex; flex-direction: column; gap: 0.15rem; align-items: center;">
+                        <div
+                            style="width: 100%; display: flex; flex-direction: column; gap: 0.1rem; margin-bottom: 0.1rem;">
+                            <!-- Custom File Input Display with Explicit Button -->
+                            <div style="display: flex; gap: 0.3rem; width: 100%; align-items: stretch;">
+                                <button type="button" class="nav-btn"
+                                    onclick="document.getElementById('forrixguard-json-file').click()"
+                                    style="padding: 0.2rem 0.6rem; font-size: 0.75rem; background: var(--accent-cyan); color: white; border: none; flex-shrink: 0; height: 32px; border-radius: 4px;">
+                                    Choose File
+                                </button>
+                                <div id="file-name-display" class="form-control" role="status" aria-live="polite"
+                                    aria-label="Selected configuration file"
+                                    style="padding: 0.25rem 0.5rem; height: 32px; font-size: 0.78rem; background: rgba(0,0,0,0.05); display: flex; align-items: center; color: var(--text-secondary); border-color: var(--border-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-grow: 1; border-radius: 4px;">
+                                    No json file chosen
+                                </div>
+                                <input type="file" id="forrixguard-json-file" accept=".json" onchange="updateFileName(this)"
+                                    style="display: none;" aria-label="ForrixGuard configuration file">
+                            </div>
+                        </div>
+                        <!-- Side-by-side Upload and Export Buttons -->
+                        <div style="display: flex; gap: 0.5rem; width: 100%; margin-top: 0.2rem;">
+                            <button class="nav-btn" onclick="uploadForrixGuardJson()" id="btn-upload-forrixguard-json"
+                                style="flex: 1; justify-content: center; background: rgba(80, 187, 169, 0.1); color: var(--giv-green); border-color: var(--giv-green); padding: 0.4rem; font-size: 0.85rem;">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+                            </button>
+                            <button class="nav-btn" onclick="exportForrixGuardJson()" id="btn-export-forrixguard-json"
+                                style="flex: 1; justify-content: center; background: rgba(8, 145, 178, 0.1); color: var(--accent-cyan); border-color: var(--accent-cyan); padding: 0.4rem; font-size: 0.85rem;">
+                                <i class="fa-solid fa-cloud-arrow-down"></i> Export
+                            </button>
+                        </div>
+                        <div id="upload-msg" style="font-size: 0.72rem; text-align: center;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle Row: System Info & Network Interfaces -->
+            <div
+                style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
+                <!-- Firmware Version -->
+                <div class="card" style="padding: 1.25rem;">
+                    <div class="card-header" style="margin-bottom: 1rem; padding-bottom: 0.75rem;">
+                        <div class="card-title">
+                            <i class="fa-solid fa-circle-info card-icon" style="color: var(--accent-purple);"></i>
+                            <span>Firmware Version</span>
+                        </div>
+                    </div>
+                    <div
+                        style="padding: 0.5rem 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr)); gap: 1rem;">
+                        <!-- ForrixGuard App Update -->
+                        <div class="fw-item" id="fw-app">
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-weight: 600; font-size: 0.95rem;">ForrixGuard App</span>
+                                <span class="info-value" id="sys-app">--</span>
+                            </div>
+                            <button class="nav-btn" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;"
+                                onclick="openFirmwareModal('ForrixGuard App')">
+                                <i class="fa-solid fa-rotate"></i> Update
+                            </button>
+                        </div>
+
+                        <!-- OS & Kernel -->
+                        <div class="fw-item" id="fw-system">
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-weight: 600; font-size: 0.95rem;">OS & Kernel</span>
+                                <span class="info-value" id="sys-sw">--</span>
+                            </div>
+                            <button class="nav-btn" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;"
+                                onclick="openFirmwareModal('System')">
+                                <i class="fa-solid fa-rotate"></i> Update
+                            </button>
+                        </div>
+
+                        <!-- U-Boot Update -->
+                        <div class="fw-item" id="fw-uboot">
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-weight: 600; font-size: 0.95rem;">U-Boot</span>
+                                <span style="font-size: 0.8rem; color: var(--text-secondary);">Bootloader</span>
+                            </div>
+                            <button class="nav-btn" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;"
+                                onclick="openFirmwareModal('U-Boot')">
+                                <i class="fa-solid fa-rotate"></i> Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Interfaces -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-network-wired card-icon" style="color: var(--accent-cyan);"></i>
+                            <span>Network Interfaces</span>
+                        </div>
+                    </div>
+                    <div class="grid-2-col" id="network-interfaces-grid">
+                        <!-- Populated by JS -->
+                        <div
+                            style="grid-column: 1/-1; padding: 2rem 0; text-align: center; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                            <span>Collecting network info...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Commissioning Setup -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-list-check card-icon" style="color: var(--accent-green);"></i>
+                        <span>Commissioning Setup</span>
+                    </div>
+                    <span class="status-indicator status-normal">Demo Ready</span>
+                </div>
+                <div class="commissioning-grid">
+                    <div class="commissioning-panel">
+                        <div class="group-title">Site & Contract</div>
+                        <div id="commissioning-site" class="commissioning-kv"></div>
+                    </div>
+                    <div class="commissioning-panel">
+                        <div class="group-title">Control Policy</div>
+                        <div id="commissioning-control" class="commissioning-kv"></div>
+                    </div>
+                    <div class="commissioning-panel">
+                        <div class="group-title">Checklist</div>
+                        <div id="commissioning-checklist" class="commissioning-checklist"></div>
+                    </div>
+                </div>
+                <div class="group-title" style="margin-top: 1.25rem;">Device Roles</div>
+                <div id="commissioning-devices" class="commissioning-devices"></div>
+                <div class="commissioning-form">
+                    <!-- Group 1: Site & Thresholds -->
+                    <div class="commissioning-form-group">
+                        <div class="commissioning-form-group-title">Site &amp; Thresholds</div>
+                        <div class="commissioning-form-row">
+                            <div class="commissioning-field">
+                                <label for="comm-customer">Site Name</label>
+                                <input id="comm-customer" class="form-control" type="text" placeholder="Pilot Customer">
+                            </div>
+                            <div class="commissioning-field">
+                                <label for="comm-sanctioned">Sanctioned Demand (kW)</label>
+                                <input id="comm-sanctioned" class="form-control" type="number" min="1" step="0.1">
+                            </div>
+                            <div class="commissioning-field">
+                                <label for="comm-margin">Safety Margin</label>
+                                <input id="comm-margin" class="form-control" type="number" min="0.5" max="1" step="0.01">
+                            </div>
+                            <div class="commissioning-field">
+                                <label for="comm-soc-reserve">BESS Reserve (%)</label>
+                                <input id="comm-soc-reserve" class="form-control" type="number" min="0" max="100" step="1">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Group 2: Device Role Mapping -->
+                    <div class="commissioning-form-group">
+                        <div class="commissioning-form-group-title">Device Role Mapping</div>
+                        <div class="commissioning-form-row">
+                            <div class="commissioning-field">
+                                <label for="comm-grid-role">Grid Meter Role</label>
+                                <select id="comm-grid-role" class="form-control">
+                                    <option value="GRID_METER">Grid Import Meter</option>
+                                </select>
+                            </div>
+                            <div class="commissioning-field">
+                                <label for="comm-solar-role">Solar Role</label>
+                                <select id="comm-solar-role" class="form-control">
+                                    <option value="SOLAR_INVERTER">Solar/BESS Inverter</option>
+                                    <option value="PV_METER">PV Meter</option>
+                                </select>
+                            </div>
+                            <div class="commissioning-field">
+                                <label for="comm-load-role">Load Mapping</label>
+                                <select id="comm-load-role" class="form-control">
+                                    <option value="CALCULATED">Calculated Load</option>
+                                    <option value="LOAD_METER">Dedicated Load Meter</option>
+                                </select>
+                            </div>
+                            <div class="commissioning-field" style="display:flex; align-items:flex-end; padding-bottom:0.1rem;">
+                                <label class="commissioning-toggle" style="margin-bottom:0;">
+                                    <input id="comm-dg-enabled" type="checkbox">
+                                    <span>DG optional / status may be mapped later</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Actions -->
+                    <div class="commissioning-actions">
+                        <button class="nav-btn" id="btn-test-commissioning" type="button">
+                            <i class="fa-solid fa-plug-circle-check"></i> Test Communication
+                        </button>
+                        <button class="nav-btn btn-primary" id="btn-save-commissioning" type="button">
+                            <i class="fa-solid fa-floppy-disk"></i> Save Commissioning
+                        </button>
+                        <div id="commissioning-result" class="commissioning-result"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tariff & Rates -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-indian-rupee-sign card-icon" style="color: #f59e0b;"></i>
+                        <span>Tariff &amp; Rates</span>
+                    </div>
+                    <button class="nav-btn btn-primary" id="btn-save-tariff" type="button">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Tariff
+                    </button>
+                </div>
+                <div class="commissioning-form">
+                    <div class="commissioning-form-group">
+                        <div class="commissioning-form-group-title">Rate Settings</div>
+                        <div class="commissioning-form-row">
+                            <div class="form-field">
+                                <label>Currency</label>
+                                <select id="tariff-currency" class="commissioning-input">
+                                    <option value="INR">INR (₹)</option>
+                                    <option value="AED">AED</option>
+                                    <option value="USD">USD ($)</option>
+                                    <option value="GBP">GBP (£)</option>
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label>Demand Charge (per kVA/month)</label>
+                                <input type="number" id="tariff-demand-charge" class="commissioning-input" step="0.01" min="0" placeholder="e.g. 350">
+                            </div>
+                            <div class="form-field">
+                                <label>Day Rate (per kWh)</label>
+                                <input type="number" id="tariff-day-rate" class="commissioning-input" step="0.001" min="0" placeholder="e.g. 8.5">
+                            </div>
+                            <div class="form-field">
+                                <label>Night Rate (per kWh)</label>
+                                <input type="number" id="tariff-night-rate" class="commissioning-input" step="0.001" min="0" placeholder="e.g. 4.2">
+                            </div>
+                            <div class="form-field">
+                                <label>Peak Start (HHMM)</label>
+                                <input type="text" id="tariff-peak-start" class="commissioning-input" placeholder="0700" maxlength="4">
+                            </div>
+                            <div class="form-field">
+                                <label>Peak End (HHMM)</label>
+                                <input type="text" id="tariff-peak-end" class="commissioning-input" placeholder="2300" maxlength="4">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Device List -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-server card-icon" style="color: var(--accent-blue);"></i>
+                        <span>Connected Devices</span>
+                    </div>
+                </div>
+                <div id="device-list-grid"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1rem;">
+                    <!-- Populated by JS -->
+                    <div style="grid-column: 1/-1; padding: 2rem 0; text-align: center; color: var(--text-secondary);">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i> Loading devices...
+                    </div>
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+
+    <footer class="site-footer" aria-label="Site footer">
+        <div class="footer-inner"
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; text-align: center;">
+            <span>Copyright © Forrix Ltd 2026. All rights reserved. Registered in England & Wales. Company
+                registration No.11571089. VAT registration number is 321482331.</span>
+            <span style="color: var(--text-secondary); font-size: 0.85rem;" title="forrixguard-monitor version">v{{
+                MONITOR_VERSION }}</span>
+        </div>
+    </footer>
+    <!-- Wi-Fi Modal -->
+    <div id="wifi-modal" class="glass-modal-overlay" style="z-index: 2000;">
+        <div class="modal-content card" style="max-width: 500px; padding: 0; background: var(--bg-card);">
+            <div class="card-header" style="margin: 0; padding: 1rem 1.5rem;">
+                <div class="card-title">
+                    <i class="fa-solid fa-wifi card-icon" style="color: var(--accent-green);"></i>
+                    <span>Wi-Fi Configuration</span>
+                </div>
+                <button onclick="closeWifiModal()" class="close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="padding: 1rem 1.5rem; max-height: 70vh; overflow-y: auto;">
+                <div style="margin-bottom: 1rem;">
+                    <button id="scan-wifi-btn" class="nav-btn" style="width: 100%; justify-content: center;">
+                        <i class="fa-solid fa-rotate-right"></i> Scan Networks
+                    </button>
+                </div>
+
+                <div class="wifi-list" id="wifi-list"
+                    style="border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem; border: 1px solid var(--border-color); padding: 0; background: rgba(0,0,0,0.02);">
+                    <div style="padding: 1rem; text-align: center; color: var(--text-secondary);">Click scan to find
+                        networks</div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <div>
+                        <label class="info-label">SSID</label>
+                        <input type="text" id="wifi-ssid" class="form-control" placeholder="Select or enter SSID">
+                    </div>
+                    <div>
+                        <label class="info-label">Password</label>
+                        <input type="password" id="wifi-pass" class="form-control" placeholder="Enter password">
+                    </div>
+                    <button id="connect-wifi-btn" class="nav-btn"
+                        style="background: var(--accent-cyan); color: white; justify-content: center; border: none; margin-top: 0.5rem;">
+                        Connect
+                    </button>
+                </div>
+                <div id="connect-msg"
+                    style="margin-top: 1rem; font-size: 0.9rem; min-height: 1.2rem; text-align: center;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Modal -->
+    <div id="security-modal" class="glass-modal-overlay" style="z-index: 2000;">
+        <div class="modal-content card" style="max-width: 450px; padding: 0; background: var(--bg-card);">
+            <div class="card-header" style="margin: 0; padding: 1rem 1.5rem;">
+                <div class="card-title">
+                    <i class="fa-solid fa-shield-halved card-icon" style="color: var(--accent-red);"></i>
+                    <span>Change Password</span>
+                </div>
+                <button onclick="closeSecurityModal()" class="close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="padding: 1rem 1.5rem;">
+                <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <div>
+                        <label class="info-label">Current Password (Required)</label>
+                        <div class="password-input-container">
+                            <input type="password" id="current-pass" class="form-control"
+                                placeholder="Enter current password">
+                            <i class="fa-solid fa-eye password-toggle"
+                                onclick="togglePassVisibility('current-pass', this)"></i>
+                        </div>
+                    </div>
+                    <div style="border-top: 1px solid var(--border-color); margin: 0.5rem 0;"></div>
+                    <div>
+                        <label class="info-label">New Username</label>
+                        <input type="text" id="new-username" class="form-control"
+                            placeholder="Keep current or enter new">
+                        <div class="validation-hint">6-20 characters, at least one letter</div>
+                    </div>
+                    <div>
+                        <label class="info-label">New Password</label>
+                        <div class="password-input-container">
+                            <input type="password" id="new-pass" class="form-control"
+                                placeholder="Keep current or enter new">
+                            <i class="fa-solid fa-eye password-toggle"
+                                onclick="togglePassVisibility('new-pass', this)"></i>
+                        </div>
+                        <div class="validation-hint">6-20 characters, at least one letter</div>
+                    </div>
+                    <button id="change-pass-btn" class="nav-btn"
+                        style="background: var(--accent-red); color: white; justify-content: center; border: none; margin-top: 0.5rem;">
+                        Save Changes
+                    </button>
+                </div>
+                <div id="pass-msg" style="margin-top: 1rem; font-size: 0.9rem; min-height: 1.2rem; text-align: center;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firmware Update Progress Modal -->
+    <div id="fw-progress-modal" class="glass-modal-overlay" style="z-index: 2001; display: none;">
+        <div class="modal-content card"
+            style="max-width: 900px; max-height: 85vh; padding: 0; background: var(--bg-card); display: flex; flex-direction: column;">
+            <div class="card-header" style="margin: 0; padding: 1rem 1.5rem; flex-shrink: 0;">
+                <div class="card-title">
+                    <i class="fa-solid fa-cloud-arrow-down card-icon" style="color: var(--accent-amber);"></i>
+                    <span id="progress-title">Firmware Update Progress</span>
+                </div>
+                <button onclick="closeFirmwareProgress()" class="close-modal" style="margin-right: -0.5rem;"><i
+                        class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="padding: 1rem 1.5rem; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                <div id="fw-progress-log" style="
+                        background: rgba(0,0,0,0.5);
+                        border: 1px solid var(--border-color);
+                        border-radius: 8px;
+                        padding: 1rem;
+                        flex: 1;
+                        overflow-y: auto;
+                        font-family: 'JetBrains Mono', 'Courier New', monospace;
+                        font-size: 0.8rem;
+                        color: #FFFFFF;
+                        margin-bottom: 1rem;
+                        line-height: 1.5;
+                        white-space: pre-wrap;
+                        word-break: break-word;
+                    ">
+                    <div style="color: var(--accent-amber); margin-bottom: 0.5rem;">[*] Initializing update...</div>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                    <div
+                        style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+                        <i class="fa-solid fa-hourglass-end fa-spin" style="color: var(--accent-amber);"></i>
+                        <span id="progress-status">Update in progress...</span>
+                    </div>
+                    <button id="fw-close-progress-btn" onclick="closeFirmwareProgress()" class="nav-btn"
+                        style="padding: 0.4rem 1rem; font-size: 0.85rem; display: none;">
+                        <i class="fa-solid fa-check"></i> Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firmware Update Modal -->
+    <div id="firmware-modal" class="glass-modal-overlay" style="z-index: 2000;">
+        <div class="modal-content card" style="max-width: 450px; padding: 0; background: var(--bg-card);">
+            <div class="card-header" style="margin: 0; padding: 1rem 1.5rem;">
+                <div class="card-title">
+                    <i class="fa-solid fa-cloud-arrow-down card-icon" style="color: var(--accent-amber);"></i>
+                    <span id="fw-modal-title">Update Firmware</span>
+                </div>
+                <button onclick="closeFirmwareModal()" class="close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="padding: 1rem 1.5rem;">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Please enter the target version to update to.
+                    </p>
+                    <div>
+                        <label class="info-label">Target Version</label>
+                        <input type="text" id="fw-version-input" class="form-control" placeholder="e.g. 1.2.0">
+                    </div>
+                    <button id="fw-update-btn" class="nav-btn"
+                        style="background: var(--accent-amber); color: white; justify-content: center; border: none; margin-top: 0.5rem;">
+                        Update
+                    </button>
+                </div>
+                <div id="fw-msg" style="margin-top: 1rem; font-size: 0.9rem; min-height: 1.2rem; text-align: center;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- IP Config Modal -->
+    <div id="ip-config-modal" class="glass-modal-overlay" style="z-index: 2000;">
+        <div class="modal-content card" style="max-width: 400px; padding: 0; background: var(--bg-card);">
+            <div class="card-header" style="margin: 0; padding: 1rem 1.5rem;">
+                <div class="card-title">
+                    <i class="fa-solid fa-network-wired card-icon" style="color: var(--accent-amber);"></i>
+                    <span>Configure IP</span>
+                </div>
+                <button onclick="closeIpConfigModal()" class="close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div style="margin-bottom: 1rem;">
+                    <label
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.3rem;">Device
+                        MAC</label>
+                    <input type="text" id="ip-config-mac" class="form-control" readonly
+                        style="background: rgba(0,0,0,0.05); color: var(--text-secondary);">
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <label
+                        style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.3rem;">Static
+                        IP Address</label>
+                    <input type="text" id="ip-config-ip" class="form-control" placeholder="e.g. 192.168.1.100">
+                </div>
+                <button class="nav-btn" onclick="saveIpConfig()"
+                    style="width: 100%; justify-content: center; background: rgba(245, 158, 11, 0.1); color: var(--accent-amber); border-color: var(--accent-amber);">
+                    <i class="fa-solid fa-save"></i> Save Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js?v={{ APP_VERSION }}"></script>
+    <script>
+        let currentUser = { username: 'unknown', role: 'user' };
+
+        async function fetchCurrentUser() {
+            try {
+                const res = await fetch('/api/me');
+                if (res.ok) {
+                    currentUser = await res.json();
+                    applyRoleRestrictions();
+                }
+            } catch (e) {
+                console.error("Error fetching user info:", e);
+            }
+        }
+
+        function applyRoleRestrictions() {
+            if (currentUser.role === 'user') {
+                // Hide restricted firmware updates
+                if (document.getElementById('fw-system')) document.getElementById('fw-system').style.display = 'none';
+                if (document.getElementById('fw-uboot')) document.getElementById('fw-uboot').style.display = 'none';
+                // Hide ForrixGuard config upload
+                if (document.getElementById('forrixguard-config-card')) document.getElementById('forrixguard-config-card').style.display = 'none';
+            } else if (currentUser.role === 'admin') {
+                // Show ForrixGuard config upload
+                if (document.getElementById('forrixguard-config-card')) document.getElementById('forrixguard-config-card').style.display = 'block';
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchCurrentUser();
+            fetchSystemInfo();
+            updateWifiStatus();
+            loadTariffConfig();
+            const testBtn = document.getElementById('btn-test-commissioning');
+            const saveBtn = document.getElementById('btn-save-commissioning');
+            const tariffBtn = document.getElementById('btn-save-tariff');
+            if (testBtn) testBtn.addEventListener('click', testCommissioning);
+            if (saveBtn) saveBtn.addEventListener('click', saveCommissioning);
+            if (tariffBtn) tariffBtn.addEventListener('click', saveTariffConfig);
+        });
+
+        function escapeSetupHtml(value) {
+            const text = value === null || value === undefined ? '' : value;
+            return String(text).replace(/[&<>"']/g, ch => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            }[ch]));
+        }
+
+        function renderKv(containerId, rows) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = rows.map(row => `
+                <div class="data-row">
+                    <span class="label">${escapeSetupHtml(row[0])}</span>
+                    <span class="value">${escapeSetupHtml(row[1])}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderCommissioning(commissioning) {
+            if (!commissioning) return;
+            const site = commissioning.site || {};
+            const md = commissioning.maximum_demand || {};
+            const control = commissioning.control || {};
+
+            renderKv('commissioning-site', [
+                ['Site', `${site.site_id || '--'} / ${site.customer || '--'}`],
+                ['Market', `${site.market || '--'} / ${site.tariff || '--'}`],
+                ['Timezone', site.timezone || '--'],
+                ['Sanctioned', `${md.sanctioned_kw || '--'} kW`],
+                ['Allowed', `${md.allowed_kw || '--'} kW`],
+                ['Window', `${md.window_seconds || '--'} sec`],
+            ]);
+
+            renderKv('commissioning-control', [
+                ['Mode', control.mode || '--'],
+                ['BESS Dispatch', control.allow_bess_dispatch ? 'Enabled' : 'Monitor only'],
+                ['Load Shedding', control.allow_load_shedding ? 'Enabled' : 'Last resort only'],
+                ['SOC Reserve', `${control.soc_reserve_pct || 35}%`],
+                ['Control Margin', `${md.control_margin_kw || '--'} kW`],
+            ]);
+
+            const checklist = document.getElementById('commissioning-checklist');
+            if (checklist) {
+                checklist.innerHTML = (commissioning.checklist || []).map(item => `
+                    <div class="commissioning-check ${item.status ? 'ok' : 'warn'}">
+                        <i class="fa-solid ${item.status ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i>
+                        <span>${escapeSetupHtml(item.label)}</span>
+                    </div>
+                `).join('');
+            }
+
+            const devices = document.getElementById('commissioning-devices');
+            if (devices) {
+                devices.innerHTML = (commissioning.device_roles || []).map(device => `
+                    <div class="commissioning-device">
+                        <strong>${escapeSetupHtml(device.type)} ${escapeSetupHtml(device.index)}: ${escapeSetupHtml(device.model)}</strong>
+                        <span>${escapeSetupHtml(device.role)}</span>
+                        <span>${escapeSetupHtml(device.interface)} / ${escapeSetupHtml(device.driver)}</span>
+                        <span>${escapeSetupHtml(device.adapter)}</span>
+                    </div>
+                `).join('');
+            }
+
+            const customerInput = document.getElementById('comm-customer');
+            const sanctionedInput = document.getElementById('comm-sanctioned');
+            const marginInput = document.getElementById('comm-margin');
+            const reserveInput = document.getElementById('comm-soc-reserve');
+            const dgInput = document.getElementById('comm-dg-enabled');
+            if (customerInput) customerInput.value = site.customer || '';
+            if (sanctionedInput) sanctionedInput.value = md.sanctioned_kw || '';
+            if (marginInput) marginInput.value = md.safety_margin || '';
+            if (reserveInput) reserveInput.value = control.soc_reserve_pct || 35;
+            if (dgInput) dgInput.checked = commissioning.control && commissioning.control.dg_optional !== false;
+        }
+
+        function commissioningPayload() {
+            return {
+                site: {
+                    customerName: document.getElementById('comm-customer').value.trim() || 'Pilot Customer'
+                },
+                maximumDemand: {
+                    sanctionedDemandKw: Number(document.getElementById('comm-sanctioned').value || 800),
+                    safetyMargin: Number(document.getElementById('comm-margin').value || 0.95)
+                },
+                control: {
+                    socReservePct: Number(document.getElementById('comm-soc-reserve').value || 35),
+                    dgOptional: document.getElementById('comm-dg-enabled').checked
+                },
+                telemetryMapping: {
+                    gridImport: { role: document.getElementById('comm-grid-role').value },
+                    solar: { role: document.getElementById('comm-solar-role').value },
+                    load: { role: document.getElementById('comm-load-role').value },
+                    bess: { role: 'BESS' },
+                    dg: { enabled: document.getElementById('comm-dg-enabled').checked }
+                },
+                deviceRoles: {
+                    'METER:0': document.getElementById('comm-grid-role').value,
+                    'INVERTER:0': document.getElementById('comm-solar-role').value,
+                    'BATTERY:0': 'BESS'
+                }
+            };
+        }
+
+        async function testCommissioning() {
+            const result = document.getElementById('commissioning-result');
+            result.textContent = 'Testing mapped telemetry...';
+            try {
+                const res = await fetch('/api/commissioning/test', { method: 'POST' });
+                const data = await res.json();
+                const rows = (data.checks || []).map(check => {
+                    const cls = check.ok ? 'ok' : 'warn';
+                    const val = check.value === null || check.value === undefined ? '--' : check.value;
+                    return `<span class="${cls}">${escapeSetupHtml(check.label)}: ${escapeSetupHtml(check.mapping)} (${escapeSetupHtml(val)})</span>`;
+                });
+                result.innerHTML = rows.join(' &nbsp; ');
+            } catch (e) {
+                result.innerHTML = `<span class="warn">Communication test failed: ${escapeSetupHtml(e.message)}</span>`;
+            }
+        }
+
+        async function saveCommissioning() {
+            const result = document.getElementById('commissioning-result');
+            result.textContent = 'Saving commissioning setup...';
+            try {
+                const res = await fetch('/api/commissioning', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(commissioningPayload())
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || data.message || 'Save failed');
+                }
+                result.innerHTML = '<span class="ok">Commissioning setup saved.</span>';
+                renderCommissioning(data.commissioning);
+            } catch (e) {
+                result.innerHTML = `<span class="warn">${escapeSetupHtml(e.message)}</span>`;
+            }
+        }
+
+        async function fetchSystemInfo() {
+            try {
+                const res = await fetch('/api/system-info');
+                const data = await res.json();
+
+                // Populate System Info
+                // document.getElementById('sys-serial').textContent = data.serial_number;
+                document.getElementById('sys-sw').textContent = data.sw_version;
+                document.getElementById('sys-app').textContent = data.app_version;
+                document.getElementById('currentDevice').textContent = data.serial_number;
+                document.getElementById('log-on-user').textContent = currentUser.username;
+                renderCommissioning(data.commissioning);
+
+                // Populate Network Interfaces
+                const container = document.getElementById('network-interfaces-grid');
+                container.innerHTML = '';
+                data.interfaces.forEach(iface => {
+                    const el = document.createElement('div');
+                    el.className = 'interface-card';
+                    el.innerHTML = `
+                        <div class="interface-name" style="margin-bottom: 0.5rem; font-weight: 600;">${iface.name}</div>
+                        <div style="font-size: 0.85rem; margin-bottom: 0.2rem; color: var(--text-secondary);">
+                            MAC: <span style="color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${iface.mac.toUpperCase()}</span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                            IP: <span style="color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${iface.ip}</span>
+                        </div>
+                    `;
+                    container.appendChild(el);
+                });
+
+
+                // Populate Services Status in Grid (forrixguard-app only)
+                if (data.services && data.services['forrixguard-app']) {
+                    const status = data.services['forrixguard-app'];
+                    const statusEl = document.getElementById('sys-status');
+                    statusEl.textContent = status.toUpperCase();
+                    statusEl.style.color = status === 'active' ? 'var(--accent-green)' : 'var(--accent-red)';
+                    statusEl.style.fontWeight = '600';
+                }
+
+                // Populate Device List
+                const devContainer = document.getElementById('device-list-grid');
+                if (data.devices) {
+                    devContainer.innerHTML = '';
+                    if (data.devices.length === 0) {
+                        devContainer.innerHTML = `
+                                <div style="grid-column: 1/-1; padding: 3rem 1rem; text-align: center; color: var(--text-secondary); background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); border-radius: 8px;">
+                                    <i class="fa-solid fa-server" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                                    <div style="font-weight: 500;">No Connected Devices Found</div>
+                                    <div style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Check ForrixGuard.json configuration</div>
+                                </div>`;
+                    } else {
+                        // Sort devices: Non-LAN first, then LAN
+                        data.devices.sort((a, b) => {
+                            const aIsLan = a.interface.toLowerCase().startsWith('lan-');
+                            const bIsLan = b.interface.toLowerCase().startsWith('lan-');
+                            if (aIsLan === bIsLan) return 0;
+                            return aIsLan ? 1 : -1;
+                        });
+
+                        data.devices.forEach(dev => {
+                            const devEl = document.createElement('div');
+                            devEl.className = 'device-card battery-highlight';
+                            devEl.style.height = '100%';
+                            // devEl.style.background handled by battery-highlight
+                            // devEl.style.border handled by battery-highlight
+                            // devEl.style.borderRadius handled by battery-highlight
+                            // devEl.style.padding handled by battery-highlight
+
+                            // Override padding if needed to match previous look, but battery-highlight has 1rem
+                            devEl.style.display = 'flex';
+                            devEl.style.flexDirection = 'column';
+                            devEl.style.justifyContent = 'space-between';
+
+                            let networkInfo = '';
+                            if (dev.interface.toLowerCase().startsWith('lan-')) {
+                                // LAN devices can show 3 per row
+
+                                networkInfo = `
+                                    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+                                        <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
+                                            <span style="font-weight: 500;">MAC Address</span>
+                                            <span style="font-family: 'JetBrains Mono', monospace; color: var(--text-primary); background: rgba(0,0,0,0.2); padding: 0.1rem 0.4rem; border-radius: 4px;">${dev.mac_address}</span>
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                                            <span style="font-weight: 500;">IP Address</span>
+                                             ${dev.ip_address === 'Unknown' || dev.ip_address === 'N/A' || dev.ip_address === 'invalid ip address'
+                                        ? (currentUser.role === 'admin' && dev.is_static
+                                            ? `<button onclick="openIpConfigModal('${dev.mac_address}')" style="background: var(--accent-amber); color: black; border: none; padding: 0.3rem 1.2rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 700;">Configure</button>`
+                                            : `<span style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic;">Not Configured</span>`)
+                                        : `<div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span style="font-family: 'JetBrains Mono', monospace; color: var(--text-primary); background: rgba(0,0,0,0.2); padding: 0.1rem 0.4rem; border-radius: 4px;">${dev.ip_address}</span>
+                                                ${(currentUser.role === 'admin' && dev.is_static) ?
+                                            `<button onclick="openIpConfigModal('${dev.mac_address}')" style="background: transparent; color: var(--text-secondary); border: none; cursor: pointer; padding: 0.2rem;" title="Change IP">
+                                                    <i class="fa-solid fa-pencil" style="font-size: 0.9rem;"></i>
+                                                </button>` : ''}
+                                               </div>`}
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                devEl.style.gridColumn = 'span 1';
+                            }
+
+                            // Build device-specific content based on type
+                            let deviceDetails = `
+                                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; justify-content: space-between;">
+                                        <span>Interface:</span>
+                                        <span style="color: var(--text-primary); font-weight: 500;">${dev.interface}</span>
+                                    </div>
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; justify-content: space-between;">
+                                        <span>Address:</span>
+                                        <span style="color: var(--text-primary); font-weight: 500;">${dev.address}</span>
+                                    </div>
+                                </div>
+                            `;
+
+                            devEl.innerHTML = `
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                    <div style="font-weight: 700; color: var(--text-primary); text-transform: uppercase; font-size: 0.95rem; letter-spacing: 0.5px;">${dev.type}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">${dev.model}</div>
+                                </div>
+                                ${deviceDetails}
+                                ${networkInfo}
+                            `;
+                            devContainer.appendChild(devEl);
+                        });
+                    }
+                }
+
+            } catch (e) {
+                console.error("Error fetching system info:", e);
+            }
+
+        }
+
+        async function updateWifiStatus() {
+            try {
+                const res = await fetch('/api/wifi/status');
+                const data = await res.json();
+                const badge = document.getElementById('wifi-status-badge');
+                if (data.connected) {
+                    badge.textContent = data.ssid;
+                    badge.style.background = 'rgba(22, 163, 74, 0.1)';
+                    badge.style.color = 'var(--accent-green)';
+                    badge.style.borderColor = 'var(--accent-green)';
+
+                    fetchWifiDetailsCard(data.ssid);
+                } else {
+                    badge.textContent = 'Disconnected';
+                    badge.style.background = 'rgba(220, 38, 38, 0.1)';
+                    badge.style.color = 'var(--accent-red)';
+                    badge.style.borderColor = 'var(--accent-red)';
+                    document.getElementById('wifi-card-static-btn-container').style.display = 'none';
+                    document.getElementById('wifi-card-dhcp-btn-container').style.display = 'none';
+                    document.getElementById('wifi-card-static-msg').style.display = 'none';
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function fetchWifiDetailsCard(ssid) {
+            const btnStaticContainer = document.getElementById('wifi-card-static-btn-container');
+            const btnDhcpContainer = document.getElementById('wifi-card-dhcp-btn-container');
+            const msgEl = document.getElementById('wifi-card-static-msg');
+
+            try {
+                const res = await fetch('/api/wifi/details');
+                if (!res.ok) {
+                    btnStaticContainer.style.display = 'none';
+                    btnDhcpContainer.style.display = 'none';
+                    msgEl.style.display = 'none';
+                    return;
+                }
+
+                const data = await res.json();
+
+                // Store globally for the static IP conversion
+                window.currentWifiDetails = { ...data, ssid: ssid };
+
+                if (data.method === 'manual') {
+                    btnStaticContainer.style.display = 'none';
+                    btnDhcpContainer.style.display = 'block';
+                    msgEl.style.display = 'block';
+                    msgEl.textContent = `Static IP Active (${data.ip})`;
+                    msgEl.style.color = 'var(--text-secondary)';
+                } else {
+                    btnStaticContainer.style.display = 'block';
+                    btnDhcpContainer.style.display = 'none';
+                    msgEl.style.display = 'none';
+                }
+            } catch (e) {
+                console.error("Failed to fetch wifi details", e);
+                btnStaticContainer.style.display = 'none';
+                btnDhcpContainer.style.display = 'none';
+                msgEl.style.display = 'none';
+            }
+        }
+
+        async function makeWifiStaticCard() {
+            const details = window.currentWifiDetails;
+            if (!details || !details.ip || !details.ssid) {
+                alert("Cannot convert to static: Missing IP or SSID details");
+                return;
+            }
+
+            let targetGw = details.gateway;
+            if (!targetGw) {
+                targetGw = prompt(`Warning: Missing Gateway IP from DHCP.\n\nPlease manually enter your network's Gateway IP to proceed (e.g., ${details.ip ? details.ip.replace(/\.\d+$/, '.1') : '192.168.1.1'}):`);
+                if (!targetGw || !targetGw.trim()) {
+                    alert("Gateway IP is required to configure a static connection.");
+                    return;
+                }
+            }
+
+            const safeSsid = String(details.ssid)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+            if (!confirm(`Are you sure you want to permanently set ${safeSsid} to use the IP address ${details.ip}?`)) {
+                return;
+            }
+
+            const btn = document.getElementById('wifi-card-make-static-btn');
+            const msg = document.getElementById('wifi-card-static-msg');
+            const originalText = btn.innerHTML;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Configuring...';
+            msg.style.display = 'block';
+            msg.textContent = "";
+
+            try {
+                const res = await fetch('/api/wifi/static', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ssid: details.ssid,
+                        ip: details.ip,
+                        gateway: targetGw.trim(),
+                        dns: details.dns || '8.8.8.8'
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    msg.innerHTML = '<i class="fa-solid fa-check"></i> Activated Static IP';
+                    msg.style.color = "var(--accent-green)";
+                    // Refresh details after a short delay
+                    setTimeout(() => fetchWifiDetailsCard(details.ssid), 2000);
+                } else {
+                    msg.textContent = data.message || "Failed to configure static IP";
+                    msg.style.color = "var(--accent-red)";
+                }
+            } catch (e) {
+                msg.textContent = "Network error occurred";
+                msg.style.color = "var(--accent-red)";
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function makeWifiDhcpCard() {
+            const details = window.currentWifiDetails;
+            if (!details || !details.ssid) {
+                alert("Cannot convert to DHCP: Missing SSID details");
+                return;
+            }
+
+            const confirmMsg = `WARNING: Converting to DHCP (Auto) will likely change your Wi-Fi IP address!\n\nIf your IP changes, you will lose connection to this dashboard. You will need to reconnect using the wired LAN connection at http://192.168.1.1:5000/\n\nIf you are sure you want to proceed, please type 'CONFIRM' below:`;
+
+            const userInput = prompt(confirmMsg);
+
+            if (userInput !== 'CONFIRM') {
+                if (userInput !== null) { // Don't alert if they just clicked Cancel
+                    alert("Action cancelled. You must type 'CONFIRM' exactly to proceed.");
+                }
+                return;
+            }
+
+            const btn = document.getElementById('wifi-card-make-dhcp-btn');
+            const msg = document.getElementById('wifi-card-static-msg');
+            const originalText = btn.innerHTML;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Configuring...';
+            msg.style.display = 'block';
+            msg.textContent = "";
+
+            try {
+                const res = await fetch('/api/wifi/dhcp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ssid: details.ssid
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    msg.innerHTML = '<i class="fa-solid fa-check"></i> Activated DHCP Mode';
+                    msg.style.color = "var(--accent-green)";
+                    // Refresh details after a short delay
+                    setTimeout(() => fetchWifiDetailsCard(details.ssid), 2000);
+                } else {
+                    msg.textContent = data.message || "Failed to configure DHCP";
+                    msg.style.color = "var(--accent-red)";
+                }
+            } catch (e) {
+                msg.textContent = "Network error occurred";
+                msg.style.color = "var(--accent-red)";
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function scanWifi() {
+            const list = document.getElementById('wifi-list');
+            list.innerHTML = '<div style="padding: 1rem; text-align: center;">Scanning... <i class="fa-solid fa-spinner fa-spin"></i></div>';
+
+            try {
+                const res = await fetch('/api/wifi/scan');
+                const networks = await res.json();
+                list.innerHTML = '';
+
+                if (networks.length === 0) {
+                    list.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-secondary);">No networks found</div>';
+                    return;
+                }
+
+                networks.forEach(net => {
+                    const item = document.createElement('div');
+                    item.className = 'wifi-item';
+                    if (net.in_use) item.classList.add('active');
+                    item.innerHTML = `
+                        <div class="wifi-ssid" style="font-weight: 500;">${net.ssid} ${net.in_use ? '<i class="fa-solid fa-check" style="color: var(--accent-green); margin-left: 0.5rem;"></i>' : ''}</div>
+                        <div class="wifi-signal" style="font-size: 0.9rem; color: var(--text-secondary);"><i class="fa-solid fa-signal" style="margin-right:0.3rem"></i>${net.signal}%</div>
+                    `;
+                    item.onclick = () => {
+                        document.getElementById('wifi-ssid').value = net.ssid;
+                    };
+                    list.appendChild(item);
+                });
+            } catch (e) {
+                list.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--accent-red);">Scan failed</div>';
+            }
+        }
+
+        document.getElementById('scan-wifi-btn').addEventListener('click', scanWifi);
+
+        document.getElementById('connect-wifi-btn').addEventListener('click', async () => {
+            const ssid = document.getElementById('wifi-ssid').value;
+            const password = document.getElementById('wifi-pass').value;
+            const msg = document.getElementById('connect-msg');
+
+            if (!ssid) {
+                msg.textContent = "Please enter SSID";
+                msg.style.color = "var(--accent-red)";
+                return;
+            }
+
+            msg.textContent = "Connecting...";
+            msg.style.color = "var(--text-secondary)";
+
+            try {
+                const res = await fetch('/api/wifi/connect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ssid, password })
+                });
+                const ret = await res.json();
+                if (ret.success) {
+                    msg.textContent = ret.message;
+                    msg.style.color = "var(--accent-green)";
+                    updateWifiStatus();
+                } else {
+                    msg.textContent = ret.message;
+                    msg.style.color = "var(--accent-red)";
+                }
+            } catch (e) {
+                msg.textContent = "Request failed";
+                msg.style.color = "var(--accent-red)";
+            }
+        });
+
+        // Security Actions
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        document.getElementById('change-pass-btn').addEventListener('click', async () => {
+            const currentPassword = document.getElementById('current-pass').value;
+            const newUsername = document.getElementById('new-username').value;
+            const newPassword = document.getElementById('new-pass').value;
+            const msg = document.getElementById('pass-msg');
+
+            if (!currentPassword) {
+                msg.textContent = "Current password is required";
+                msg.style.color = "var(--accent-red)";
+                return;
+            }
+
+            function isValid(val) {
+                if (!val) return true; // Optional fields
+                if (val.length < 6 || val.length > 20) return false;
+                return /[a-zA-Z]/.test(val);
+            }
+
+            if (newUsername && newUsername !== currentUser.username && !isValid(newUsername)) {
+                msg.textContent = "Username must be 6-20 chars with at least one letter";
+                msg.style.color = "var(--accent-red)";
+                return;
+            }
+
+            if (newPassword && !isValid(newPassword)) {
+                msg.textContent = "Password must be 6-20 chars with at least one letter";
+                msg.style.color = "var(--accent-red)";
+                return;
+            }
+
+            msg.textContent = "Updating...";
+            msg.style.color = "var(--text-secondary)";
+
+            try {
+                const res = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ currentPassword, newUsername, newPassword })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    msg.textContent = "Credentials updated! Redirecting to login page...";
+                    msg.style.color = "var(--accent-green)";
+                    document.getElementById('current-pass').value = '';
+                    document.getElementById('new-pass').value = '';
+
+                    // Auto logout and redirect after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                } else {
+                    msg.textContent = data.message;
+                    msg.style.color = "var(--accent-red)";
+                }
+            } catch (e) {
+                msg.textContent = "Request failed";
+                msg.style.color = "var(--accent-red)";
+            }
+        });
+
+        // Modal Functions
+        function togglePassVisibility(inputId, icon) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        function openWifiModal() {
+            document.getElementById('wifi-modal').classList.add('active');
+        }
+
+        function closeWifiModal() {
+            document.getElementById('wifi-modal').classList.remove('active');
+        }
+
+        function openSecurityModal() {
+            document.getElementById('security-modal').classList.add('active');
+            document.getElementById('pass-msg').textContent = '';
+
+            // Set username field state
+            const userField = document.getElementById('new-username');
+            userField.value = currentUser.username;
+            if (currentUser.role === 'admin') {
+                userField.disabled = true;
+                userField.title = "Admin username cannot be changed";
+            } else {
+                userField.disabled = false;
+                userField.title = "Enter new username";
+            }
+        }
+
+        function closeSecurityModal() {
+            document.getElementById('security-modal').classList.remove('active');
+        }
+
+        // Service Control
+        async function rebootSystem() {
+            const btn = document.getElementById('btn-reboot-sys');
+            const msgEl = document.getElementById('reboot-sys-msg');
+            const originalText = btn.innerHTML;
+
+            if (!confirm("Are you sure you want to reboot the system? This will interrupt monitoring and take a few minutes.")) {
+                return;
+            }
+
+            // Set loading state
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Rebooting...';
+            if (msgEl) {
+                msgEl.style.display = 'block';
+                msgEl.textContent = 'Initiating reboot...';
+            }
+
+            try {
+                const response = await fetch('/api/system/reboot', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    btn.style.borderColor = 'var(--accent-red)';
+                    btn.style.color = 'var(--accent-red)';
+                    btn.style.background = 'rgba(220, 38, 38, 0.1)';
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> System Rebooting';
+
+                    if (msgEl) {
+                        msgEl.innerHTML = 'Please wait for reboot completion.<br>The dashboard will automatically reload when the system is online.';
+                        msgEl.style.color = 'var(--accent-amber)';
+                    }
+
+                    setTimeout(() => {
+                        if (msgEl) {
+                            msgEl.innerHTML = 'System Rebooting<span class="dots-container" id="reboot-dots"></span><br>The dashboard will automatically reload when the system is online.';
+                            startDotAnimation('reboot-dots');
+                        }
+                        checkSystemStatus(btn, msgEl);
+                    }, 5000); // Start checking after 5s
+                    return true;
+                } else {
+                    throw new Error(result.message || 'Reboot failed');
+                }
+            } catch (e) {
+                console.error('Reboot failed:', e);
+                btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Failed';
+                if (msgEl) {
+                    msgEl.style.display = 'none';
+                }
+                alert(`Reboot failed: ${e.message}`);
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }, 3000);
+                return false;
+            }
+        }
+
+        function startDotAnimation(elementId) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+
+            // Clear any existing animation on this element
+            if (el._dotInterval) clearInterval(el._dotInterval);
+
+            let count = 0;
+            el._dotInterval = setInterval(() => {
+                count = (count + 1) % 5; // 0, 1, 2, 3, 4
+                el.textContent = '.'.repeat(count);
+            }, 500);
+        }
+
+        function checkSystemStatus(btnEl = null, msgEl = null, attemptCount = 0, waitForOffline = true) {
+            // Stop polling after ~5 minutes (100 attempts * ~3s each)
+            if (attemptCount >= 100) {
+                if (msgEl) {
+                    msgEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> System is unreachable after 5 minutes. Please check the power or network connection.';
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+                if (btnEl) btnEl.disabled = false;
+                const progressStatusEl = document.getElementById('progress-status');
+                if (progressStatusEl) {
+                    progressStatusEl.textContent = 'System unreachable. Refresh page to try again.';
+                    progressStatusEl.style.color = 'red';
+                }
+                return;
+            }
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+            const nextAttemptCount = attemptCount + 1;
+
+            fetch('/login', { signal: controller.signal })
+                .then(res => {
+                    clearTimeout(timeoutId);
+                    if (waitForOffline) {
+                        // Server hasn't shut down yet. Keep waiting for it to go offline.
+                        setTimeout(() => checkSystemStatus(btnEl, msgEl, nextAttemptCount, true), 3000);
+                    } else if (res.ok) {
+                        // Server is back! Reload the active page
+                        if (btnEl) {
+                            btnEl.innerHTML = '<i class="fa-solid fa-check"></i> System Online!';
+                        }
+                        if (msgEl) {
+                            msgEl.textContent = 'System Online! Reloading dashboard...';
+                            msgEl.style.color = 'var(--accent-green)';
+                        }
+                        const progressStatusEl = document.getElementById('progress-status');
+                        if (progressStatusEl) {
+                            progressStatusEl.textContent = 'System Online! Reloading...';
+                            progressStatusEl.style.color = '#00FF00';
+                        }
+
+                        // Give the user 2 seconds to read the success message before redirecting to login
+                        setTimeout(() => window.location.href = '/login', 2000);
+                    } else {
+                        // Server responded with an error (e.g. 502), it is still spinning up. Keep trying.
+                        setTimeout(() => checkSystemStatus(btnEl, msgEl, nextAttemptCount, false), 3000);
+                    }
+                })
+                .catch(err => {
+                    // Fetch failed (server is offline or network dropped)
+                    clearTimeout(timeoutId);
+                    // We successfully detected it offline or still offline. Transition to waiting for online.
+                    setTimeout(() => checkSystemStatus(btnEl, msgEl, nextAttemptCount, false), 3000);
+                });
+        }
+
+        async function restartEmsApp(silent = false) {
+            const btn = document.getElementById('btn-restart-app');
+            const originalText = btn.innerHTML;
+
+            if (!silent && !confirm("Are you sure you want to restart the ForrixGuard application? This will briefly interrupt monitoring.")) {
+                return;
+            }
+
+            // Set loading state
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Restarting...';
+
+            try {
+                const response = await fetch('/api/system/restart-app', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    btn.style.borderColor = 'var(--accent-green)';
+                    btn.style.color = 'var(--accent-green)';
+                    btn.style.background = 'rgba(22, 163, 74, 0.1)';
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Success';
+
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                        // Reset styles
+                        btn.style.borderColor = 'var(--accent-amber)';
+                        btn.style.color = 'var(--accent-amber)';
+                        btn.style.background = 'rgba(245, 158, 11, 0.1)';
+
+                        // Reload system info to update status if needed
+                        fetchSystemInfo();
+
+                        // Clear the upload message if it exists
+                        const uploadMsg = document.getElementById('upload-msg');
+                        if (uploadMsg) uploadMsg.textContent = '';
+                    }, 3000);
+                    return true;
+                } else {
+                    throw new Error(result.message || 'Restart failed');
+                }
+            } catch (e) {
+                console.error('Restart failed:', e);
+                btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Failed';
+                if (!silent) alert(`Restart failed: ${e.message}`);
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }, 3000);
+                return false;
+            }
+        }
+
+        async function uploadForrixGuardJson() {
+            const fileInput = document.getElementById('forrixguard-json-file');
+            const btn = document.getElementById('btn-upload-forrixguard-json');
+            const msg = document.getElementById('upload-msg');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                msg.textContent = "Please select a file first";
+                msg.style.color = "var(--accent-red)";
+                return;
+            }
+
+            if (!file.name.toLowerCase().endsWith('.json')) {
+                msg.textContent = "Only .json files are allowed";
+                msg.style.color = "var(--accent-red)";
+                return;
+            }
+
+            if (!confirm("Are you sure you want to upload this ForrixGuard.json? The ForrixGuard application will be stopped during upload.")) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            btn.disabled = true;
+            msg.textContent = "Uploading...";
+            msg.style.color = "var(--accent-amber)";
+
+            try {
+                const response = await fetch('/api/system/upload-forrixguard-json', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    msg.textContent = result.message;
+                    msg.style.color = "var(--accent-green)";
+                    fileInput.value = '';
+                    if (typeof updateFileName === 'function') updateFileName(fileInput);
+
+                    // Prompt for restart
+                    setTimeout(() => {
+                        if (confirm("ForrixGuard configuration updated successfully. Would you like to restart the ForrixGuard application now to apply changes?")) {
+                            restartEmsApp(true);
+                        }
+                    }, 500);
+                } else {
+                    throw new Error(result.message || 'Upload failed');
+                }
+            } catch (e) {
+                console.error('Upload failed:', e);
+                msg.textContent = `Upload failed: ${e.message}`;
+                msg.style.color = "var(--accent-red)";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Firmware Modal Functions
+        let currentUpdateType = '';
+
+        function openFirmwareModal(type) {
+            currentUpdateType = type;
+            document.getElementById('fw-modal-title').textContent = `${type} Update`;
+            document.getElementById('fw-version-input').value = '';
+            document.getElementById('fw-msg').textContent = '';
+            document.getElementById('firmware-modal').classList.add('active');
+        }
+
+        function closeFirmwareModal() {
+            document.getElementById('firmware-modal').classList.remove('active');
+        }
+
+        document.getElementById('fw-update-btn').addEventListener('click', async () => {
+            const version = document.getElementById('fw-version-input').value;
+            const msg = document.getElementById('fw-msg');
+
+            if (!version) {
+                msg.textContent = "Please enter a version";
+                msg.style.color = "var(--accent-red)";
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to update ${currentUpdateType} to version ${version}?`)) {
+                return;
+            }
+
+            msg.textContent = "Initiating update...";
+            msg.style.color = "var(--accent-amber)";
+
+            try {
+                let endpoint = '';
+                if (currentUpdateType === 'System') {
+                    endpoint = '/api/firmware/update/system';
+                } else if (currentUpdateType === 'ForrixGuard App') {
+                    endpoint = '/api/firmware/update/forrixguard-app';
+                } else if (currentUpdateType === 'U-Boot') {
+                    endpoint = '/api/firmware/update/uboot';
+                } else {
+                    throw new Error('Unknown update type');
+                }
+
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ version })
+                });
+
+                const result = await res.json();
+
+                if (result.success) {
+                    msg.textContent = result.message;
+                    msg.style.color = "var(--accent-green)";
+                    document.getElementById('fw-version-input').value = '';
+
+                    // Show progress modal
+                    showFirmwareProgress(currentUpdateType, version);
+
+                    // Close firmware modal after a delay
+                    setTimeout(() => {
+                        closeFirmwareModal();
+                    }, 1500);
+                } else {
+                    msg.textContent = result.message || 'Update failed';
+                    msg.style.color = "var(--accent-red)";
+                }
+            } catch (e) {
+                msg.textContent = `Error: ${e.message}`;
+                msg.style.color = "var(--accent-red)";
+                console.error(e);
+            }
+        });
+
+        // Firmware Progress Modal Functions
+        function showFirmwareProgress(type, version) {
+            document.getElementById('progress-title').textContent = `${type} Update - v${version}`;
+            document.getElementById('progress-status').textContent = 'Update in progress...';
+            document.getElementById('fw-progress-log').innerHTML = `<div style="color: var(--accent-amber); margin-bottom: 0.5rem;">[*] Starting ${type} update to version ${version}...</div>`;
+            document.getElementById('fw-close-progress-btn').style.display = 'none';
+
+            // Reset finalized flag and seen-message set when a new update starts
+            window.fwUpdateFinalized = false;
+            window.fwProgressSeen = new Set();
+
+            // Show modal
+            const modal = document.getElementById('fw-progress-modal');
+            modal.style.display = 'flex';
+            // Small delay to ensure display:flex applies before adding active class for transition
+            setTimeout(() => {
+                modal.classList.add('active');
+            }, 10);
+
+            // Connect to WebSocket for progress updates
+            connectFirmwareProgressWs();
+
+            // Immediate status check so UI updates quickly if backend already finished
+            (async () => {
+                try {
+                    const res = await fetch('/api/firmware/status');
+                    if (!res.ok) return;
+                    const st = await res.json();
+
+                    // Append recent progress messages we may have missed while WS was down
+                    if (st.progress_messages && Array.isArray(st.progress_messages)) {
+                        st.progress_messages.forEach(pm => {
+                            try {
+                                const id = `${pm.timestamp}|${pm.message}`;
+                                if (!window.fwProgressSeen.has(id)) {
+                                    window.fwProgressSeen.add(id);
+                                    addProgressLog(pm.message || pm.msg || pm.data || '', 'info');
+                                }
+                            } catch (e) { /* ignore malformed entries */ }
+                        });
+                    }
+
+                    if (!st.in_progress && st.last_update && st.last_update.status) {
+                        const final = st.last_update.status.toString().toLowerCase();
+                        if (final === 'failed') {
+                            updateFirmwareStatus('FAILED');
+                        } else if (final === 'completed_running' || final === 'completed_rebooting' || final === 'success') {
+                            updateFirmwareStatus('SUCCESS');
+                        }
+                    }
+                } catch (e) {
+                    console.debug('Immediate firmware status check failed:', e);
+                }
+            })();
+
+            // No polling fallback: rely on WebSocket and immediate status check
+        }
+
+        function closeFirmwareProgress() {
+            const modal = document.getElementById('fw-progress-modal');
+            modal.classList.remove('active');
+
+            // Wait for transition to complete before hiding
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+
+            if (window.fwUpdateWs) {
+                try { window.fwUpdateWs.close(); } catch (e) { /* ignore */ }
+                window.fwUpdateWs = null;
+            }
+
+            if (window.fwProgressPollInterval) {
+                clearInterval(window.fwProgressPollInterval);
+                window.fwProgressPollInterval = null;
+            }
+        }
+
+        function addProgressLog(message, level = 'info') {
+            const progressLog = document.getElementById('fw-progress-log');
+            const timestamp = new Date().toLocaleTimeString('en-GB');
+
+            let color = '#FFFFFF'; // White for info
+            let prefix = '[•]';
+
+            if (level === 'success') {
+                color = '#00FF00';
+                prefix = '[✓]';
+            } else if (level === 'error') {
+                color = '#FF6B6B';
+                prefix = '[✗]';
+            } else if (level === 'warning') {
+                color = '#FFD700';
+                prefix = '[!]';
+            } else if (level === 'status') {
+                color = '#87CEEB';
+                prefix = '[*]';
+            }
+
+            const logLine = document.createElement('div');
+            logLine.style.color = color;
+            logLine.style.marginBottom = '2px';
+            logLine.textContent = `${prefix} [${timestamp}] ${message}`;
+
+            progressLog.appendChild(logLine);
+            progressLog.scrollTop = progressLog.scrollHeight;
+        }
+
+        function updateFirmwareStatus(status) {
+            const progressStatus = document.getElementById('progress-status');
+            const spinner = progressStatus.parentElement.querySelector('i');
+            const closeBtn = document.getElementById('fw-close-progress-btn');
+            const progressLog = document.getElementById('fw-progress-log');
+            // Prevent duplicate finalization
+            if (window.fwUpdateFinalized) return;
+
+            if (status === 'SUCCESS') {
+                window.fwUpdateFinalized = true;
+                // stop polling if active
+                if (window.fwProgressPollInterval) {
+                    clearInterval(window.fwProgressPollInterval);
+                    window.fwProgressPollInterval = null;
+                }
+                // close WS connection to avoid receiving more messages
+                try { if (window.fwUpdateWs) { window.fwUpdateWs.close(); window.fwUpdateWs = null; } } catch (e) { }
+                // Update status display
+                progressStatus.textContent = 'Update successful!';
+                progressStatus.style.color = '#00FF00';
+
+                // Update spinner to checkmark
+                spinner.classList.remove('fa-hourglass-end', 'fa-spin');
+                spinner.classList.add('fa-check-circle');
+                spinner.style.color = '#00FF00';
+
+                // Show completion button
+                closeBtn.style.display = 'block';
+                closeBtn.innerHTML = '<i class="fa-solid fa-check"></i> Done';
+                closeBtn.style.background = 'rgba(22, 163, 74, 0.1)';
+                closeBtn.style.borderColor = 'var(--accent-green)';
+                closeBtn.style.color = 'var(--accent-green)';
+
+                // Final state reached; UI updated. Rely on server log entries for detailed messages.
+
+                // If it's a system update, U-Boot update, or ForrixGuard App update, we know it involves a reboot.
+                if (currentUpdateType === 'System' || currentUpdateType === 'U-Boot' || currentUpdateType === 'ForrixGuard App') {
+                    progressStatus.innerHTML = 'Update successful! Waiting for reboot...';
+                    addProgressLog('Update applied successfully. System is rebooting...', 'status');
+                    progressStatus.style.color = 'var(--accent-amber)';
+                    closeBtn.style.display = 'none'; // Hide close button since we'll auto-reload
+
+                    // Start checking system status after a delay
+                    setTimeout(() => {
+                        progressStatus.innerHTML = 'System Rebooting<span class="dots-container" id="update-dots"></span>';
+                        startDotAnimation('update-dots');
+                        checkSystemStatus();
+                    }, 4000);
+                }
+
+            } else if (status === 'FAILED') {
+                window.fwUpdateFinalized = true;
+                if (window.fwProgressPollInterval) {
+                    clearInterval(window.fwProgressPollInterval);
+                    window.fwProgressPollInterval = null;
+                }
+                try { if (window.fwUpdateWs) { window.fwUpdateWs.close(); window.fwUpdateWs = null; } } catch (e) { }
+                // Update status display
+                progressStatus.textContent = 'Update failed!';
+                progressStatus.style.color = '#FF6B6B';
+
+                // Update spinner to X
+                spinner.classList.remove('fa-hourglass-end', 'fa-spin');
+                spinner.classList.add('fa-times-circle');
+                spinner.style.color = '#FF6B6B';
+
+                // Show completion button
+                closeBtn.style.display = 'block';
+                closeBtn.textContent = '✕ Close';
+                closeBtn.style.background = 'rgba(255, 107, 107, 0.2)';
+                closeBtn.style.borderColor = '#FF6B6B';
+                closeBtn.style.color = '#FF6B6B';
+
+                // Final state reached; UI updated. Rely on server-sent logs for failure details.
+            }
+        }
+
+        function connectFirmwareProgressWs() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            try {
+                window.fwUpdateWs = new WebSocket(wsUrl);
+                let connectionAttempts = 0;
+
+                window.fwUpdateWs.onopen = () => {
+                    addProgressLog('Connected to update stream', 'success');
+                    console.log('Connected to firmware progress stream');
+                    connectionAttempts = 0;
+                };
+
+                window.fwUpdateWs.onmessage = (event) => {
+                    try {
+                        let message;
+                        try {
+                            message = JSON.parse(event.data);
+                        } catch (e) {
+                            // If payload is plain string, treat it as message text
+                            message = { type: 'string', data: event.data };
+                        }
+
+                        if (message.type === 'fw_update_progress') {
+                            // Support multiple payload shapes: string, { message: '...' }, { data: '...' }
+                            let msgText = '';
+                            if (typeof message.data === 'string') {
+                                msgText = message.data;
+                            } else if (message.data && typeof message.data.message === 'string') {
+                                msgText = message.data.message;
+                            } else if (message.data && typeof message.data.data === 'string') {
+                                msgText = message.data.data;
+                            } else if (message.message && typeof message.message === 'string') {
+                                msgText = message.message;
+                            }
+
+                            msgText = (msgText || '').toString().trim();
+
+                            // Detect STATUS:SUCCESS / STATUS:FAILED anywhere in the text (case-insensitive)
+                            const m = msgText.match(/STATUS:\s*(SUCCESS|FAILED)/i);
+                            if (m) {
+                                const status = m[1].toUpperCase();
+                                // Only process final statuses once
+                                if (!window.fwUpdateFinalized) {
+                                    updateFirmwareStatus(status);
+                                }
+                            } else if (msgText.length > 0) {
+                                addProgressLog(msgText, 'info');
+                            }
+                        } else if (message.type === 'string' && message.data) {
+                            // Fallback for simple string payloads
+                            const msgText = message.data.toString().trim();
+                            const m = msgText.match(/STATUS:\s*(SUCCESS|FAILED)/i);
+                            if (m) {
+                                const status = m[1].toUpperCase();
+                                if (!window.fwUpdateFinalized) {
+                                    updateFirmwareStatus(status);
+                                }
+                            } else if (msgText.length > 0) {
+                                addProgressLog(msgText, 'info');
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error processing WS message:', e);
+                    }
+                };
+
+                window.fwUpdateWs.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    addProgressLog('WebSocket connection error. Check console for details.', 'error');
+                };
+
+                window.fwUpdateWs.onclose = () => {
+                    console.log('Disconnected from firmware progress stream');
+                    window.fwUpdateWs = null;
+                    // If not finalized, allow the user to close and show disconnected hint
+                    try {
+                        const progressStatusEl = document.getElementById('progress-status');
+                        const text = (progressStatusEl && progressStatusEl.textContent) ? progressStatusEl.textContent : '';
+                        if (!window.fwUpdateFinalized && /Update in progress/i.test(text)) {
+                            document.getElementById('fw-close-progress-btn').style.display = 'block';
+                            progressStatusEl.textContent = 'Update completed or disconnected';
+                            // Fetch any missed progress messages from the server and append them
+                            (async () => {
+                                try {
+                                    const res = await fetch('/api/firmware/status');
+                                    if (!res.ok) return;
+                                    const st = await res.json();
+                                    if (st.progress_messages && Array.isArray(st.progress_messages)) {
+                                        st.progress_messages.forEach(pm => {
+                                            try {
+                                                const id = `${pm.timestamp}|${pm.message}`;
+                                                if (!window.fwProgressSeen.has(id)) {
+                                                    window.fwProgressSeen.add(id);
+                                                    addProgressLog(pm.message || pm.msg || pm.data || '', 'info');
+                                                }
+                                            } catch (e) { /* ignore malformed entries */ }
+                                        });
+                                    }
+                                    // If server indicates final status, update UI accordingly
+                                    if (st.last_update && st.last_update.status && !window.fwUpdateFinalized) {
+                                        const final = st.last_update.status.toString().toLowerCase();
+                                        if (final === 'failed') {
+                                            updateFirmwareStatus('FAILED');
+                                        } else if (final === 'completed_running' || final === 'completed_rebooting' || final === 'success') {
+                                            updateFirmwareStatus('SUCCESS');
+                                            // Trigger smart polling if it was a rebooting type
+                                            if (final === 'completed_rebooting' || currentUpdateType === 'System' || currentUpdateType === 'U-Boot' || currentUpdateType === 'ForrixGuard App') {
+                                                progressStatusEl.innerHTML = 'System Rebooting<span class="dots-container" id="update-dots-alt"></span>';
+                                                progressStatusEl.style.color = 'var(--accent-amber)';
+                                                startDotAnimation('update-dots-alt');
+                                                setTimeout(() => checkSystemStatus(), 4000); // Wait 4s then start polling
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.debug('Fetch after WS close failed:', e);
+                                }
+                            })();
+                        }
+                    } catch (e) { /* ignore */ }
+                };
+            } catch (e) {
+                console.error('Failed to connect WebSocket:', e);
+                addProgressLog('Failed to connect to update stream: ' + e.message, 'error');
+            }
+        }
+
+        // Close on click outside
+        window.onclick = function (event) {
+            if (event.target == document.getElementById('wifi-modal')) {
+                closeWifiModal();
+            }
+            if (event.target == document.getElementById('security-modal')) {
+                closeSecurityModal();
+            }
+            if (event.target == document.getElementById('firmware-modal')) {
+                closeFirmwareModal();
+            }
+            if (event.target == document.getElementById('fw-progress-modal')) {
+                // Don't allow closing progress modal by clicking outside
+                // hideFirmwareProgress();
+            }
+        }
+
+        // Initialize
+        fetchSystemInfo();
+        updateWifiStatus();
+
+
+        // IP Config Modal Logic
+        let currentConfigMac = '';
+
+        function openIpConfigModal(mac) {
+            currentConfigMac = mac;
+            document.getElementById('ip-config-mac').value = mac;
+            document.getElementById('ip-config-ip').value = ''; // Clear previous
+            document.getElementById('ip-config-modal').classList.add('active');
+        }
+
+        function closeIpConfigModal() {
+            document.getElementById('ip-config-modal').classList.remove('active');
+            currentConfigMac = '';
+        }
+
+        async function saveIpConfig() {
+            const ip = document.getElementById('ip-config-ip').value.trim();
+            if (!ip) {
+                alert("Please enter an IP address");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/save-ip-lease', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mac: currentConfigMac, ip: ip })
+                });
+
+                if (res.ok) {
+                    closeIpConfigModal();
+                    fetchSystemInfo(); // Refresh list
+                } else {
+                    const data = await res.json();
+                    alert("Error saving IP: " + (data.error || "Unknown error"));
+                }
+            } catch (e) {
+                console.error("Save IP error:", e);
+                alert("Failed to save IP");
+            }
+        }
+
+        async function exportForrixGuardJson() {
+            try {
+                window.location.href = '/api/system/export-forrixguard-json';
+            } catch (e) {
+                console.error('Export failed:', e);
+                alert(`Export failed: ${e.message}`);
+            }
+        }
+
+        function openHelpModal() {
+            document.getElementById('help-modal').classList.add('active');
+        }
+
+        function closeHelpModal() {
+            document.getElementById('help-modal').classList.remove('active');
+        }
+
+        function updateFileName(input) {
+            const display = document.getElementById('file-name-display');
+            if (input.files && input.files.length > 0) {
+                display.textContent = input.files[0].name;
+                display.style.color = 'var(--text-primary)';
+            } else {
+                display.textContent = 'No json file chosen';
+                display.style.color = 'var(--text-secondary)';
+            }
+        }
+    </script>
+
+
+    <!-- ForrixGuard Configuration Help Modal -->
+    <div id="help-modal" class="glass-modal-overlay" style="z-index: 2000;">
+        <div class="modal-content card" style="max-width: 500px; padding: 0; background: var(--bg-card);">
+            <div class="card-header" style="margin: 0; padding: 1rem 1.5rem;">
+                <div class="card-title">
+                    <i class="fa-solid fa-circle-info card-icon" style="color: var(--accent-cyan);"></i>
+                    <span>ForrixGuard Configuration Help</span>
+                </div>
+                <button onclick="closeHelpModal()" class="close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="padding: 1.5rem; line-height: 1.6;">
+                <p style="margin-bottom: 1rem; color: var(--text-primary);">
+                    This container allows you to manage the <strong>ForrixGuard.json</strong> configuration file, which defines
+                    the device type, serial number, and connection settings for the system.
+                </p>
+                <div
+                    style="background: rgba(8, 145, 178, 0.05); border-left: 4px solid var(--accent-cyan); padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+                    <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.8rem;">
+                        <li style="display: flex; gap: 0.75rem;">
+                            <i class="fa-solid fa-cloud-arrow-up"
+                                style="color: var(--giv-green); margin-top: 0.2rem;"></i>
+                            <span><strong>Upload:</strong> Update the device type or settings by uploading a new
+                                configuration file. The serial number will be automatically synced with the hardware
+                                fuses.</span>
+                        </li>
+                        <li style="display: flex; gap: 0.75rem;">
+                            <i class="fa-solid fa-cloud-arrow-down"
+                                style="color: var(--accent-cyan); margin-top: 0.2rem;"></i>
+                            <span><strong>Export:</strong> Download a backup of the current ForrixGuard.json file to your
+                                computer.</span>
+                        </li>
+                    </ul>
+                </div>
+                <p style="font-size: 0.9rem; color: var(--text-secondary); font-style: italic;">
+                    Note: The ForrixGuard application service will be automatically restarted when applying a new configuration.
+                </p>
+            </div>
+        </div>
+    </div>
+
+
+
+    <script src="/static/js/theme.js?v={{ APP_VERSION }}"></script>
+</body>
+
+</html>

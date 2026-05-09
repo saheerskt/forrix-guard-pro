@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase Power Analytics | ForrixGuard Monitor</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css?v={{ APP_VERSION }}">
+    <!-- Footer -->
+
+
+    <script src="/static/js/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="/static/js/main.js?v={{ APP_VERSION }}"></script>
+</head>
+
+<body class="theme-dark">
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    <div class="container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="dashboard-title">
+                <div class="title-group">
+                    <h1>Live Power Plots</h1>
+                </div>
+                <div class="dashboard-subtitle">
+                    Plots of three-phase active power
+                </div>
+            </div>
+
+            <nav class="nav-bar">
+                <a href="/multi" class="nav-btn">
+                    <i class="fa-solid fa-grip"></i> Dashboard
+                </a>
+                <a href="/phase-power-comparison" class="nav-btn active">
+                    <i class="fa-solid fa-chart-line"></i> Power Plots
+                </a>
+                <a href="/power-time-settings" class="nav-btn">
+                    <i class="fa-regular fa-clock"></i> Power Settings
+                </a>
+                <a href="/monthly-report" class="nav-btn">
+                    <i class="fa-solid fa-file-invoice"></i> Monthly Report
+                </a>
+                <a href="/forrixguard-setup" class="nav-btn">
+                    <i class="fa-solid fa-sliders"></i> ForrixGuard Setup
+                </a>
+                <div class="user-profile-badge"
+                    style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem; margin-right: 1rem; padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid var(--border-color);">
+                    <i class="fa-solid fa-user-circle" id="user-role-icon" style="color: var(--accent-cyan);"></i>
+                    <span id="user-display-name"
+                        style="font-size: 0.85rem; font-weight: 500; color: var(--text-primary);">...</span>
+                </div>
+                <button id="logout-btn" class="nav-btn"
+                    style="color: var(--accent-red); border-color: rgba(220, 38, 38, 0.3); background: rgba(220, 38, 38, 0.1);">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </nav>
+        </header>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <span id="connection-status" class="status-indicator status-offline">System Offline</span>
+                </div>
+                <div class="status-item">
+                    <i class="fa-regular fa-clock"></i>
+                    <span class="status-label">Last Update:</span>
+                    <span class="status-value" id="lastUpdate">--</span>
+                </div>
+            </div>
+            <div class="status-right">
+                <div class="status-item">
+                    <button id="pauseResumeBtn" class="pause-resume-btn" title="Pause graph updates">
+                        Pause <i class="fa-solid fa-pause"></i>
+                    </button>
+                    <button id="helpBtn" class="pause-resume-btn" title="Help & Information"
+                        style="color: var(--accent-cyan); border-color: var(--accent-cyan);">
+                        Help <i class="fa-regular fa-circle-question"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-wrapper">
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div class="card full-width-card">
+                    <div class="card-header" style="justify-content: space-between; align-items: center;">
+                        <div class="card-title">
+                            <i class="fa-solid fa-wave-square card-icon" style="color: var(--accent-cyan);"></i>
+                            <span>Phase A Power</span>
+                        </div>
+                        <div class="tooltip-toggle-wrapper"
+                            style="display: flex; align-items: center; gap: 0.5rem; margin-right: auto; margin-left: 1.5rem;">
+                            <input type="checkbox" id="phaseA-tooltip-toggle" checked
+                                style="cursor: pointer; accent-color: var(--text-secondary);">
+                            <label for="phaseA-tooltip-toggle"
+                                style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">Tooltip</label>
+                        </div>
+                        <div id="phaseA-devices"
+                            style="display: flex; gap: 1rem; font-size: 0.85rem; flex-wrap: wrap; justify-content: flex-end;">
+                        </div>
+                    </div>
+                    <div class="chart-wrapper" style="height: 300px;">
+                        <canvas id="phaseAChart" width="800" height="300"></canvas>
+                    </div>
+                </div>
+
+                <div class="card full-width-card">
+                    <div class="card-header" style="justify-content: space-between; align-items: center;">
+                        <div class="card-title">
+                            <i class="fa-solid fa-wave-square card-icon" style="color: var(--accent-green);"></i>
+                            <span>Phase B Power</span>
+                        </div>
+                        <div class="tooltip-toggle-wrapper"
+                            style="display: flex; align-items: center; gap: 0.5rem; margin-right: auto; margin-left: 1.5rem;">
+                            <input type="checkbox" id="phaseB-tooltip-toggle" checked
+                                style="cursor: pointer; accent-color: var(--text-secondary);">
+                            <label for="phaseB-tooltip-toggle"
+                                style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">Tooltip</label>
+                        </div>
+                        <div id="phaseB-devices"
+                            style="display: flex; gap: 1rem; font-size: 0.85rem; flex-wrap: wrap; justify-content: flex-end;">
+                        </div>
+                    </div>
+                    <div class="chart-wrapper" style="height: 300px;">
+                        <canvas id="phaseBChart" width="800" height="300"></canvas>
+                    </div>
+                </div>
+
+                <div class="card full-width-card">
+                    <div class="card-header" style="justify-content: space-between; align-items: center;">
+                        <div class="card-title">
+                            <i class="fa-solid fa-wave-square card-icon" style="color: var(--accent-amber);"></i>
+                            <span>Phase C Power</span>
+                        </div>
+                        <div class="tooltip-toggle-wrapper"
+                            style="display: flex; align-items: center; gap: 0.5rem; margin-right: auto; margin-left: 1.5rem;">
+                            <input type="checkbox" id="phaseC-tooltip-toggle" checked
+                                style="cursor: pointer; accent-color: var(--text-secondary);">
+                            <label for="phaseC-tooltip-toggle"
+                                style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">Tooltip</label>
+                        </div>
+                        <div id="phaseC-devices"
+                            style="display: flex; gap: 1rem; font-size: 0.85rem; flex-wrap: wrap; justify-content: flex-end;">
+                        </div>
+                    </div>
+                    <div class="chart-wrapper" style="height: 300px;">
+                        <canvas id="phaseCChart" width="800" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer" aria-label="Site footer">
+        <div class="footer-inner"
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; text-align: center;">
+            <span>Copyright © Forrix Ltd 2026. All rights reserved. Registered in England & Wales. Company
+                registration No.11571089. VAT registration number is 321482331.</span>
+            <span style="color: var(--text-secondary); font-size: 0.85rem;" title="forrixguard-monitor version">v{{
+                MONITOR_VERSION }}</span>
+        </div>
+    </footer>
+    <!-- Chart.js Config -->
+    <script>
+        // Chart Configuration
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        // Theme-aware colors
+        const THEME_COLORS = {
+            light: {
+                text: '#1e293b', // Slate-800 (Darker for better visibility)
+                grid: 'rgba(148, 163, 184, 0.2)', // Slate-400 opacity
+                tooltipBg: 'rgba(255, 255, 255, 0.95)',
+                tooltipText: '#1e293b',
+                tooltipTitle: '#1e293b'
+            },
+            dark: {
+                text: '#cbd5e1', // Slate-300 (Lighter Grey, matches CSS)
+                grid: 'rgba(255, 255, 255, 0.1)', // White opacity
+                tooltipBg: 'rgba(15, 23, 42, 0.95)', // Slate-900
+                tooltipText: '#f8fafc',
+                tooltipTitle: '#f8fafc'
+            }
+        };
+
+        function getCurrentTheme() {
+            return document.body.classList.contains('theme-dark') ? 'dark' : 'light';
+        }
+
+        function setChartDefaults() {
+            const theme = getCurrentTheme();
+            const colors = THEME_COLORS[theme];
+
+            Chart.defaults.color = colors.text;
+            Chart.defaults.borderColor = colors.grid;
+        }
+
+        // Initialize defaults
+        setChartDefaults();
+
+        // Neon colors still work well as accents, but maybe slightly darker for visibility on white
+        // Cyan, Green, Purple
+        const datasetColors = ['#0891b2', '#16a34a', '#9333ea'];
+        const labels = [];
+        const allDeviceData = {};
+        const allDeviceStatus = {}; // Stores boolean: true if real data, false if repeated
+        let maxDevices = 6;
+        const maxSamples = 120;
+
+        function getChartColor(index) {
+            // Enhanced palette - carefully chosen to avoid similar adjacent colors
+            // Ensures SP 0, SP 1, SP 2 all have distinctly different colors
+            const colors = [
+                '#0891b2', // Cyan-600 (Blue)
+                '#16a34a', // Green-600 (Green)
+                '#d97706', // Amber-600 (Orange)
+                '#7c3aed', // Violet-600 (Purple - darker)
+                '#dc2626', // Red-600 (Red)
+                '#0369a1'  // Sky-700 (Dark Blue)
+            ];
+            // Cycle through palette for more devices
+            return colors[index % colors.length];
+        }
+
+        function createPhaseChart(ctxId, phaseLabel, deviceKeys) {
+            const ctx = document.getElementById(ctxId);
+            if (!ctx) return null;
+
+            const datasets = [];
+
+            deviceKeys.forEach((fieldName, idx) => {
+                let deviceLabel = '';
+                let isMeter = false;
+                if (fieldName.startsWith('m')) {
+                    const meterNum = parseInt(fieldName.match(/m(\d+)/)[1]);
+                    if (meterNum === 0) deviceLabel = 'Grid Meter';
+                    else if (meterNum === 1) deviceLabel = 'PV Meter';
+                    else if (meterNum === 2) deviceLabel = 'Load Meter';
+                    else deviceLabel = `Meter ${meterNum}`;
+                    isMeter = true;
+                } else if (fieldName.startsWith('inv')) {
+                    const invNum = fieldName.match(/inv(\d+)/)[1];
+                    if (fieldName.includes('_setpoint')) {
+                        // Setpoint label with SP prefix
+                        deviceLabel = `SP ${invNum}`;
+                    } else {
+                        deviceLabel = `Inverter ${invNum}`;
+                    }
+                }
+
+                datasets.push({
+                    label: deviceLabel,
+                    deviceKey: fieldName, // Store key for access in tooltip callback
+                    data: allDeviceData[fieldName] = [],
+                    borderColor: getChartColor(idx),
+                    backgroundColor: getChartColor(idx), // for legend
+                    fill: false,
+                    tension: 0.4, // Smoother curves
+                    borderWidth: 2,
+                    borderDash: fieldName.includes('_setpoint') ? [10, 5] : (isMeter ? [5, 5] : []), // Dashed for setpoints, dotted for meters
+                    pointRadius: 0, // Clean lines
+                    pointHoverRadius: 4
+                });
+            });
+
+            const theme = getCurrentTheme();
+            const colors = THEME_COLORS[theme];
+
+            return new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: colors.tooltipBg,
+                            titleColor: colors.tooltipTitle,
+                            bodyColor: colors.tooltipText,
+                            borderColor: colors.grid,
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: true,
+                            boxPadding: 4,
+                            callbacks: {
+                                title: function (context) {
+                                    // Show time from x-axis label
+                                    return 'Time: ' + context[0].label;
+                                },
+                                label: function (context) {
+                                    // Format: "Label: Value W"
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y !== null ? context.parsed.y.toFixed(1) : 'N/A';
+                                    return label + ': ' + value + ' W';
+                                },
+                                labelColor: function (context) {
+                                    const datasetIndex = context.datasetIndex;
+                                    const dataIndex = context.dataIndex;
+                                    const deviceKey = context.dataset.deviceKey;
+                                    const color = context.dataset.borderColor;
+
+                                    // Check status if available
+                                    let isRealData = true;
+                                    if (deviceKey && allDeviceStatus[deviceKey] && typeof allDeviceStatus[deviceKey][dataIndex] !== 'undefined') {
+                                        isRealData = allDeviceStatus[deviceKey][dataIndex];
+                                    }
+
+                                    return {
+                                        borderColor: color,
+                                        backgroundColor: isRealData ? color : 'transparent', // Hollow (transparent) if not real
+                                        borderWidth: isRealData ? 0 : 3, // Thicker border for hollow
+                                        borderDash: [],
+                                        borderRadius: 2,
+                                    };
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            afterFit: function (scaleInstance) {
+                                scaleInstance.width = 60; // Fixed width to prevent jitter
+                            },
+                            grid: {
+                                color: colors.grid
+                            },
+                            ticks: {
+                                color: colors.text
+                            },
+                            title: {
+                                display: true,
+                                text: 'Power(W)',
+                                color: colors.text
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: colors.text
+                            },
+                            title: {
+                                display: false,
+                                text: 'Time(Hh:Mm:Ss:ms)',
+                                color: colors.text,
+                                padding: { top: 4 }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'verticalHoverLine',
+                    afterDatasetsDraw: (chart) => {
+                        const { ctx, tooltip, chartArea: { top, bottom } } = chart;
+
+                        if (tooltip && tooltip._active && tooltip._active.length) {
+                            const activePoint = tooltip._active[0];
+                            const x = activePoint.element.x;
+
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.moveTo(x, top);
+                            ctx.lineTo(x, bottom);
+                            ctx.lineWidth = 1;
+                            ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    }
+                }]
+            });
+        }
+
+        let phaseAKeys = [], phaseBKeys = [], phaseCKeys = [];
+        let phaseAChart = null, phaseBChart = null, phaseCChart = null;
+
+        let phaseASetpointKeys = [], phaseBSetpointKeys = [], phaseCSetpointKeys = [];
+
+        // Pause/Resume state
+        let isGraphPaused = false;
+
+        function initializeCharts(data) {
+            const meterKeys = [];
+            const inverterKeys = [];
+
+            for (let i = 0; i < 10; i++) {
+                if (typeof data[`m${i}_power`] !== 'undefined') meterKeys.push(i);
+                if (typeof data[`inv${i}_phaseA_power`] !== 'undefined') inverterKeys.push(i);
+            }
+
+            let totalDevices = Math.min(meterKeys.length + inverterKeys.length, maxDevices);
+            let meterCount = Math.min(meterKeys.length, totalDevices);
+            let inverterCount = Math.min(inverterKeys.length, totalDevices - meterCount);
+
+            phaseAKeys = []; phaseBKeys = []; phaseCKeys = [];
+            phaseASetpointKeys = []; phaseBSetpointKeys = []; phaseCSetpointKeys = [];
+
+            for (let i = 0; i < meterCount; i++) {
+                const mIdx = meterKeys[i];
+                phaseAKeys.push(`m${mIdx}_power`);
+                phaseBKeys.push(`m${mIdx}_phaseB_power`);
+                phaseCKeys.push(`m${mIdx}_phaseC_power`);
+            }
+
+            for (let i = 0; i < inverterCount; i++) {
+                const invIdx = inverterKeys[i];
+                phaseAKeys.push(`inv${invIdx}_phaseA_power`);
+                phaseBKeys.push(`inv${invIdx}_phaseB_power`);
+                phaseCKeys.push(`inv${invIdx}_phaseC_power`);
+            }
+
+            // Map setpoints to phases: inv{id}_phase{A/B/C}_setpoint
+            // We scan data for any key matching this pattern
+            phaseASetpointKeys = [];
+            phaseBSetpointKeys = [];
+            phaseCSetpointKeys = [];
+
+            Object.keys(data).forEach(key => {
+                if (key.includes('_setpoint')) {
+                    if (key.includes('_phaseA_')) phaseASetpointKeys.push(key);
+                    else if (key.includes('_phaseB_')) phaseBSetpointKeys.push(key);
+                    else if (key.includes('_phaseC_')) phaseCSetpointKeys.push(key);
+                }
+            });
+
+            // Sort them to be deterministic (inv0, inv1...)
+            phaseASetpointKeys.sort();
+            phaseBSetpointKeys.sort();
+            phaseCSetpointKeys.sort();
+
+            if (!phaseAChart) {
+                phaseAChart = createPhaseChart('phaseAChart', 'A', [...phaseAKeys, ...phaseASetpointKeys]);
+                phaseBChart = createPhaseChart('phaseBChart', 'B', [...phaseBKeys, ...phaseBSetpointKeys]);
+                phaseCChart = createPhaseChart('phaseCChart', 'C', [...phaseCKeys, ...phaseCSetpointKeys]);
+
+                // Populate device selector in headers (Must match the keys passed to createPhaseChart)
+                renderDeviceSelectors([...phaseAKeys, ...phaseASetpointKeys], 'phaseA-devices', phaseAChart);
+                renderDeviceSelectors([...phaseBKeys, ...phaseBSetpointKeys], 'phaseB-devices', phaseBChart);
+                renderDeviceSelectors([...phaseCKeys, ...phaseCSetpointKeys], 'phaseC-devices', phaseCChart);
+
+                // Setup Tooltip Toggles
+                setupTooltipToggle(phaseAChart, 'phaseA-tooltip-toggle');
+                setupTooltipToggle(phaseBChart, 'phaseB-tooltip-toggle');
+                setupTooltipToggle(phaseCChart, 'phaseC-tooltip-toggle');
+            }
+        }
+
+        function setupTooltipToggle(chart, checkboxId) {
+            const checkbox = document.getElementById(checkboxId);
+            if (!checkbox || !chart) return;
+
+            // Initialize state based on checkbox (default checked in HTML)
+            chart.options.plugins.tooltip.enabled = checkbox.checked;
+            chart.update();
+
+            checkbox.addEventListener('change', () => {
+                chart.options.plugins.tooltip.enabled = checkbox.checked;
+                chart.update();
+            });
+        }
+
+        function renderDeviceSelectors(keys, containerId, chart) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            keys.forEach((fieldName, idx) => {
+                let deviceLabel = '';
+                if (fieldName.startsWith('m')) {
+                    const meterNum = parseInt(fieldName.match(/m(\d+)/)[1]);
+                    if (meterNum === 0) deviceLabel = 'Grid Meter';
+                    else if (meterNum === 1) deviceLabel = 'PV Meter';
+                    else if (meterNum === 2) deviceLabel = 'Load Meter';
+                    else deviceLabel = `Meter ${meterNum}`;
+                } else if (fieldName.startsWith('inv')) {
+                    const invNum = fieldName.match(/inv(\d+)/)[1];
+                    if (fieldName.includes('_setpoint')) {
+                        deviceLabel = `SP ${invNum}`;
+                    } else {
+                        deviceLabel = `Inverter ${invNum}`;
+                    }
+                }
+
+                const checkboxWrapper = document.createElement('div');
+                checkboxWrapper.className = 'chart-legend-item'; // Use CSS class instead of inline styles
+
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.checked = true;
+                input.dataset.datasetIndex = idx;
+                input.style.cursor = 'pointer';
+                input.style.width = '16px';
+                input.style.height = '16px';
+                input.style.accentColor = getChartColor(idx);
+
+                const label = document.createElement('span');
+                label.textContent = deviceLabel;
+                label.style.fontSize = '0.85rem';
+                label.style.fontWeight = '500';
+                // Color handled by CSS class/theme
+
+                input.addEventListener('change', () => {
+                    chart.getDatasetMeta(idx).hidden = !input.checked;
+                    label.style.opacity = !input.checked ? '0.5' : '1';
+                    chart.update();
+                });
+
+                checkboxWrapper.appendChild(input);
+                checkboxWrapper.appendChild(label);
+
+                // No need for mouseenter/mouseleave, CSS handles hover
+
+                container.appendChild(checkboxWrapper);
+            });
+        }
+
+        function fetchData() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    if (!phaseAChart) initializeCharts(data);
+                    updateCharts(data);
+                    $('#connection-status').removeClass('status-offline').addClass('status-normal').text('System Online');
+                    if (data.timestamp) {
+                        const date = new Date(data.timestamp);
+                        $('#lastUpdate').text(date.toLocaleTimeString());
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    $('#connection-status').removeClass('status-normal').addClass('status-offline').text('System Offline');
+                });
+        }
+
+        function updateCharts(data) {
+            // Skip data update if graph is paused
+            if (isGraphPaused) {
+                return;
+            }
+
+            let ts = data.timestamp ? new Date(data.timestamp) : new Date();
+            let timeLabel = ts.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '.' + String(ts.getMilliseconds()).padStart(3, '0');
+
+            if (labels.length >= maxSamples) {
+                labels.shift();
+                Object.keys(allDeviceData).forEach(key => {
+                    if (allDeviceData[key].length > 0) allDeviceData[key].shift();
+                    // Keep status synced
+                    if (allDeviceStatus[key] && allDeviceStatus[key].length > 0) allDeviceStatus[key].shift();
+                });
+            }
+            labels.push(timeLabel);
+
+            function pushOrRepeat(obj, key) {
+                // Ensure status array exists
+                if (!allDeviceStatus[key]) allDeviceStatus[key] = [];
+
+                // Check data_status from backend to determine if data is new or repeated
+                let isNewData = false;
+
+                // Debug: Check if this key exists in data_status
+                const hasStatusFlag = data.data_status && typeof data.data_status[key] === 'boolean';
+
+                if (hasStatusFlag) {
+                    // Use backend's data_status flag if available
+                    isNewData = data.data_status[key];
+                    if (isNewData && ['m0_power', 'm0_phaseB_power', 'm0_phaseC_power', 'm1_power'].includes(key)) {
+                        console.log(`✓ ${key}: TRUE (new data)`);
+                    }
+                } else if (typeof data[key] !== 'undefined' && data[key] !== null) {
+                    // Fallback: assume new data if field exists (legacy behavior)
+                    isNewData = true;
+                } else {
+                    // No data received
+                    isNewData = false;
+                }
+
+                if (typeof data[key] !== 'undefined' && data[key] !== null) {
+                    obj[key].push(data[key]);
+                    allDeviceStatus[key].push(isNewData);
+                } else {
+                    obj[key].push(obj[key].length ? obj[key][obj[key].length - 1] : null);
+                    allDeviceStatus[key].push(false); // No new data received
+                }
+            }
+
+            [...phaseAKeys, ...phaseBKeys, ...phaseCKeys, ...phaseASetpointKeys, ...phaseBSetpointKeys, ...phaseCSetpointKeys].forEach(key => {
+                if (!allDeviceData[key]) allDeviceData[key] = [];
+                pushOrRepeat(allDeviceData, key);
+            });
+
+            // Debug: Show which keys have status flags and which don't
+            if (data.data_status) {
+                const allKeys = [...phaseAKeys, ...phaseBKeys, ...phaseCKeys, ...phaseASetpointKeys, ...phaseBSetpointKeys, ...phaseCSetpointKeys];
+
+                // Check ONLY active power fields (no reactive, no voltage, no freq, no current, no setpoints)
+                const powerFields = allKeys.filter(k => k.includes('_power') && !k.includes('reactive'));
+                const powerStatus = {};
+                powerFields.forEach(k => {
+                    powerStatus[k] = data.data_status[k] === true ? '✓' : '✗';
+                });
+            }
+
+            if (phaseAChart && phaseBChart && phaseCChart) {
+                [
+                    { chart: phaseAChart, keys: phaseAKeys },
+                    { chart: phaseBChart, keys: phaseBKeys },
+                    { chart: phaseCChart, keys: phaseCKeys }
+                ].forEach(({ chart, keys }) => {
+                    chart.update('none'); // efficient update
+                });
+            }
+        }
+
+        window.onload = function () {
+            fetchData();
+            setInterval(fetchData, 1000);
+
+            // Setup Pause/Resume button
+            const pauseResumeBtn = document.getElementById('pauseResumeBtn');
+
+            // Initial state check (optional, but good for consistency)
+            // HTML default is "Pause", isGraphPaused = false. Correct.
+
+            pauseResumeBtn.addEventListener('click', function () {
+                isGraphPaused = !isGraphPaused;
+
+                if (isGraphPaused) {
+                    // Graph is now paused. User sees "Resume" option.
+                    pauseResumeBtn.classList.add('paused');
+                    pauseResumeBtn.innerHTML = 'Resume <i class="fa-solid fa-play"></i>';
+                    pauseResumeBtn.title = 'Resume graph updates';
+                } else {
+                    // Graph is now resumed. User sees "Pause" option.
+                    pauseResumeBtn.classList.remove('paused');
+                    pauseResumeBtn.innerHTML = 'Pause <i class="fa-solid fa-pause"></i>';
+                    pauseResumeBtn.title = 'Pause graph updates';
+                }
+            });
+
+            // Help Modal Logic
+            const helpBtn = document.getElementById('helpBtn');
+            const helpModal = document.getElementById('helpModal');
+            const closeModal = document.querySelector('.close-modal');
+            const modalOverlay = document.getElementById('helpModal');
+
+            function openModal() {
+                helpModal.classList.add('active');
+            }
+
+            function closeModalFunc() {
+                helpModal.classList.remove('active');
+            }
+
+            helpBtn.addEventListener('click', openModal);
+            closeModal.addEventListener('click', closeModalFunc);
+
+            // Close on click outside
+            window.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) {
+                    closeModalFunc();
+                }
+            });
+
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && helpModal.classList.contains('active')) {
+                    closeModalFunc();
+                }
+            });
+
+            // Theme Change Listener
+            window.addEventListener('themeChanged', (e) => {
+                const isDark = e.detail.isDark;
+                const theme = isDark ? 'dark' : 'light';
+                const colors = THEME_COLORS[theme];
+
+                // Update Charts
+                const charts = [phaseAChart, phaseBChart, phaseCChart];
+                charts.forEach(chart => {
+                    if (chart) {
+                        chart.options.scales.x.ticks.color = colors.text;
+                        chart.options.scales.y.ticks.color = colors.text;
+                        chart.options.scales.y.grid.color = colors.grid;
+
+                        // Update tooltip colors
+                        chart.options.plugins.tooltip.backgroundColor = colors.tooltipBg;
+                        chart.options.plugins.tooltip.titleColor = colors.tooltipTitle;
+                        chart.options.plugins.tooltip.bodyColor = colors.tooltipText;
+                        chart.options.plugins.tooltip.borderColor = colors.grid;
+
+                        chart.update('none'); // Efficient update without animation
+                    }
+                });
+            });
+        };
+    </script>
+    <div id="helpModal" class="glass-modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fa-regular fa-circle-question" style="color: var(--accent-cyan);"></i>
+                    <span>Dashboard Help</span>
+                </div>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <div class="help-subtitle">
+                        <i class="fa-solid fa-chart-line"></i> Graph Basics
+                    </div>
+                    <ul class="help-list">
+                        <li><strong>Three Phases:</strong> The dashboard displays real-time power data for Phase A, B,
+                            and C independently.</li>
+                        <li><strong>Devices:</strong> Each chart aggregates data from Meters, Inverters, and Setpoints
+                            connected to that phase.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <div class="help-subtitle">
+                        <i class="fa-solid fa-message"></i> Tooltips & Data
+                    </div>
+                    <ul class="help-list">
+                        <li><strong>Vertical Crosshair:</strong> Hover over the graph to see a vertical line indicating
+                            the exact time slot.</li>
+                        <li><strong>Filled Box (■):</strong> Indicates <strong>Actual Data</strong> was received from
+                            the device at this timestamp.</li>
+                        <li><strong>Hollow Box (□):</strong> Indicates <strong>Repeated Data</strong> (no new value
+                            received, previous value held).</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <div class="help-subtitle">
+                        <i class="fa-solid fa-sliders"></i> Controls
+                    </div>
+                    <ul class="help-list">
+                        <li><strong>Pause/Resume:</strong> Stop the live update to inspect historical data closer.</li>
+                        <li><strong>Tooltip Toggle:</strong> Use the checkbox in each graph header to show/hide tooltips
+                            individually.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    </script>
+
+    <script src="/static/js/theme.js?v={{ APP_VERSION }}"></script>
+</body>
+
+</html>

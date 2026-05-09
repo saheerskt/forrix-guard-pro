@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Slots Management | ForrixGuard Monitor</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css?v={{ APP_VERSION }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Probe for Socket.IO endpoint before loading client to avoid 404 spam
+        // If not present, provide a lightweight no-op socket shim.
+        window.createSocketClient = async function (timeoutMs = 1500) {
+            const probeUrl = '/socket.io/?EIO=4&transport=polling';
+            let ok = false;
+            try {
+                const controller = new AbortController();
+                const id = setTimeout(() => controller.abort(), timeoutMs);
+                const res = await fetch(probeUrl, { method: 'GET', signal: controller.signal });
+                clearTimeout(id);
+                ok = res && res.status >= 200 && res.status < 400;
+            } catch (e) {
+                ok = false;
+            }
+
+            if (!ok) {
+                // Return a minimal shim to avoid errors where code expects a socket
+                return {
+                    on: function () { },
+                    emit: function () { },
+                    off: function () { },
+                    close: function () { }
+                };
+            }
+
+            // Dynamically load the Socket.IO client script from CDN and wait for it
+            await new Promise((resolve, reject) => {
+                if (window.io) return resolve();
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js';
+                s.async = true;
+                s.onload = () => resolve();
+                s.onerror = () => reject(new Error('Failed to load socket.io client'));
+                document.head.appendChild(s);
+            });
+
+            // Create real socket
+            try {
+                return window.io();
+            } catch (e) {
+                return { on: function () { }, emit: function () { }, off: function () { }, close: function () { } };
+            }
+        };
+    </script>
+    <style>
+        .form-section-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-top: 1.5rem;
+            margin-bottom: 0.8rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.3rem;
+        }
+
+        .day-checkbox {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .day-checkbox input {
+            display: none;
+        }
+
+        .day-checkbox span {
+            display: inline-block;
+            padding: 0.4rem 0.8rem;
+            background: var(--bg-card);
+            /* was rgba(255,255,255,0.05) */
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .day-checkbox input:checked+span {
+            background: var(--accent-cyan);
+            color: white;
+            /* Contrast text for checked state */
+            border-color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        .transition-opacity {
+            transition: opacity 0.3s ease;
+        }
+
+        .container-disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-weight: 600;
+            background: rgba(107, 114, 128, 0.2);
+            color: var(--text-secondary);
+            border: 1px solid rgba(107, 114, 128, 0.3);
+        }
+
+        .status-badge.status-normal {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .spc-value {
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body class="theme-dark">
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    <div class="container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="dashboard-title">
+                <div class="title-group">
+                    <h1>Power Settings</h1>
+                </div>
+                <div class="dashboard-subtitle">
+                    Manage Scheduling & Power Constraint
+                </div>
+            </div>
+
+            <nav class="nav-bar">
+                <a href="/multi" class="nav-btn">
+                    <i class="fa-solid fa-grip"></i> Dashboard
+                </a>
+                <a href="/phase-power-comparison" class="nav-btn">
+                    <i class="fa-solid fa-chart-line"></i> Power Plots
+                </a>
+                <a href="/power-time-settings" class="nav-btn active">
+                    <i class="fa-regular fa-clock"></i> Power Settings
+                </a>
+                <a href="/monthly-report" class="nav-btn">
+                    <i class="fa-solid fa-file-invoice"></i> Monthly Report
+                </a>
+                <a href="/forrixguard-setup" class="nav-btn">
+                    <i class="fa-solid fa-sliders"></i> ForrixGuard Setup
+                </a>
+                <div class="user-profile-badge"
+                    style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem; margin-right: 1rem; padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid var(--border-color);">
+                    <i class="fa-solid fa-user-circle" id="user-role-icon" style="color: var(--accent-cyan);"></i>
+                    <span id="user-display-name"
+                        style="font-size: 0.85rem; font-weight: 500; color: var(--text-primary);">...</span>
+                </div>
+                <button id="logout-btn" class="nav-btn"
+                    style="color: var(--accent-red); border-color: rgba(220, 38, 38, 0.3); background: rgba(220, 38, 38, 0.1);">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </nav>
+        </header>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <span id="connection-status" class="status-indicator status-normal">System Online</span>
+                </div>
+
+            </div>
+            <div class="status-right">
+                <!-- Placeholder -->
+            </div>
+        </div>
+
+        <div class="content-wrapper">
+            <!-- Power Constraints Card -->
+            <div class="card full-width-card" id="power-constraints-card" style="margin-bottom: 2rem;">
+                <div class="card-header" style="margin-bottom: 1rem;">
+                    <div class="card-title">
+                        <i class="fa-solid fa-bolt card-icon"></i>
+                        <span>Power Constraints</span>
+                    </div>
+                    <div class="card-actions" id="edit-constraints-btn-container">
+                        <button onclick="openConstraintsModal()" class="btn-lg"
+                            style="background: var(--bg-dark); color: var(--accent-cyan); border: 1px solid var(--border-color); font-size: 0.9rem; padding: 0.6rem 1.2rem; border-radius: 8px;">
+                            <i class="fa-solid fa-pencil"></i> Edit
+                        </button>
+                    </div>
+                </div>
+
+                <div id="admin-notice"
+                    style="display: none; padding: 0.75rem 1rem; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 8px; margin: 0 0 1.5rem 0; color: #fbbf24; font-size: 0.85rem; align-items: center; gap: 0.75rem;">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>Power Constraints are not yet configured. Please contact your system administrator.</span>
+                </div>
+
+                <div class="grid-4-col"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 0 0 1rem 0;">
+                    <div
+                        style="display: flex; flex-direction: column; background: var(--bg-dark); padding: 1rem; border-radius: 8px;">
+                        <span class="subtitle" style="font-size: 0.75rem;">Circuit Breaker Export Limit</span>
+                        <span class="value-mono" style="color: var(--accent-red); font-size: 1.2rem;"
+                            id="disp-min-power-constraint">-- W</span>
+                    </div>
+                    <div
+                        style="display: flex; flex-direction: column; background: var(--bg-dark); padding: 1rem; border-radius: 8px;">
+                        <span class="subtitle" style="font-size: 0.75rem;">Circuit Breaker Import Limit</span>
+                        <span class="value-mono" style="color: var(--accent-green); font-size: 1.2rem;"
+                            id="disp-max-power-constraint">-- W</span>
+                    </div>
+                    <div
+                        style="display: flex; flex-direction: column; background: var(--bg-dark); padding: 1rem; border-radius: 8px;">
+                        <span class="subtitle" style="font-size: 0.75rem;">G100 Export Limit</span>
+                        <span class="value-mono" style="color: var(--accent-red); font-size: 1.2rem;"
+                            id="disp-min-power-limit">-- W</span>
+                    </div>
+                    <div
+                        style="display: flex; flex-direction: column; background: var(--bg-dark); padding: 1rem; border-radius: 8px;">
+                        <span class="subtitle" style="font-size: 0.75rem;">G100 Import Limit</span>
+                        <span class="value-mono" style="color: var(--accent-green); font-size: 1.2rem;"
+                            id="disp-max-power-limit">-- VA</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Smart Power Control Card -->
+            <div class="card full-width-card" id="smart-power-control-card" style="margin-bottom: 2rem;">
+                <div class="card-header" style="margin-bottom: 1rem;">
+                    <div class="card-title">
+                        <i class="fa-solid fa-microchip card-icon"></i>
+                        <span>Smart Power Control</span>
+                    </div>
+                    <div class="card-actions" id="edit-smart-control-btn-container">
+                        <button onclick="openSmartControlModal()" class="btn-lg"
+                            style="background: var(--bg-dark); color: var(--accent-cyan); border: 1px solid var(--border-color); font-size: 0.9rem; padding: 0.6rem 1.2rem; border-radius: 8px;">
+                            <i class="fa-solid fa-pencil"></i> Edit
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid-2-col" style="gap: 1.5rem;">
+                    <!-- Power Factor Improver -->
+                    <div style="background: var(--bg-dark); padding: 1rem; border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Power Factor
+                                Improvement</span>
+                            <span id="disp-pf-improver-status" class="status-badge"
+                                style="font-size: 0.75rem;">Disabled</span>
+                        </div>
+                    </div>
+
+                    <!-- Ramping Charge Power -->
+                    <div style="background: var(--bg-dark); padding: 1rem; border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Ramping
+                                Charge Power</span>
+                            <span id="disp-ramping-status" class="status-badge"
+                                style="font-size: 0.75rem;">Disabled</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">Start SOC:</span>
+                            <span id="disp-ramping-soc" class="spc-value"
+                                style="font-size: 0.85rem; color: var(--accent-cyan);">90%</span>
+                        </div>
+                    </div>
+
+                    <!-- Battery High/Low Voltage Protection -->
+                    <div style="background: var(--bg-dark); padding: 1rem; border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Battery
+                                Voltage Protection</span>
+                            <span id="disp-voltage-protection-status" class="status-badge"
+                                style="font-size: 0.75rem;">Disabled</span>
+                        </div>
+                        <div
+                            style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.5rem; font-size: 0.75rem;">
+                            <div>
+                                <span style="color: var(--text-secondary);">Max:</span>
+                                <span id="disp-max-cell-voltage" class="spc-value"
+                                    style="color: var(--accent-cyan);">3.6V</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary);">Min:</span>
+                                <span id="disp-min-cell-voltage" class="spc-value"
+                                    style="color: var(--accent-cyan);">2.8V</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary);">Diff:</span>
+                                <span id="disp-voltage-diff" class="spc-value"
+                                    style="color: var(--accent-cyan);">0.15V</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Battery Temperature Protection -->
+                    <div style="background: var(--bg-dark); padding: 1rem; border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Battery
+                                Temperature Protection</span>
+                            <span id="disp-temp-protection-status" class="status-badge"
+                                style="font-size: 0.75rem;">Disabled</span>
+                        </div>
+                        <div
+                            style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.5rem; font-size: 0.75rem;">
+                            <div>
+                                <span style="color: var(--text-secondary);">Max:</span>
+                                <span id="disp-max-cell-temp" class="spc-value"
+                                    style="color: var(--accent-cyan);">55°C</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary);">Min:</span>
+                                <span id="disp-min-cell-temp" class="spc-value"
+                                    style="color: var(--accent-cyan);">0°C</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary);">Diff:</span>
+                                <span id="disp-temp-diff" class="spc-value"
+                                    style="color: var(--accent-cyan);">5°C</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Visualization/List -->
+            <div class="card full-width-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-list-ul card-icon"></i>
+                        <span>Defined Slots (<span id="slot-count">0</span>)</span>
+                    </div>
+                    <div class="card-actions" id="add-slot-btn-container">
+                        <button onclick="openAddModal()" class="btn-lg"
+                            style="background: var(--accent-cyan); color: var(--bg-dark); border: none; font-size: 0.9rem; padding: 0.6rem 1.2rem; border-radius: 8px;">
+                            <i class="fa-solid fa-plus"></i> Add New Slot
+                        </button>
+                    </div>
+                </div>
+
+                <div id="slots-container" class="slots-grid-list">
+                    <!-- Slots will be injected here -->
+                    <div class="no-data">No time slots configured.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer" aria-label="Site footer">
+        <div class="footer-inner"
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; text-align: center;">
+            <span>Copyright © Forrix Ltd 2026. All rights reserved. Registered in England & Wales. Company
+                registration No.11571089. VAT registration number is 321482331.</span>
+            <span style="color: var(--text-secondary); font-size: 0.85rem;" title="forrixguard-monitor version">v{{ MONITOR_VERSION }}</span>
+        </div>
+    </footer>
+
+    <!-- Modal for Add/Edit -->
+    <div id="slot-modal" class="glass-modal-overlay" style="z-index: 2000;">
+        <div class="card modal-content"
+            style="width: 100%; max-width: 550px; max-height: 90vh; overflow-y: auto; background: var(--bg-card); padding: 0;">
+            <div class="card-header" style="margin: 0; padding: 1rem 1.5rem;">
+                <div class="card-title">
+                    <i class="fa-solid fa-pen-to-square card-icon"></i>
+                    <span id="form-title">Add New Slot</span>
+                </div>
+                <button onclick="closeModal()" class="close-modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div style="padding: 0.75rem 1.5rem 1.5rem;">
+                <form id="slot-form" onsubmit="saveSlot(event)">
+                    <input type="hidden" id="edit-stream-id" value="">
+                    <!-- Logical ID for the slot, kept for backend compatibility -->
+                    <input type="hidden" id="slot-logical-id" value="">
+
+                    <div class="form-section-title" style="margin-top: 0;">Active Days & Time</div>
+                    <div class="form-group">
+                        <div class="days-selector" style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                            <label class="day-checkbox">
+                                <input type="checkbox" name="days" value="Monday"> <span>Mon</span>
+                            </label>
+                            <label class="day-checkbox">
+                                <input type="checkbox" name="days" value="Tuesday"> <span>Tue</span>
+                            </label>
+                            <label class="day-checkbox">
+                                <input type="checkbox" name="days" value="Wednesday"> <span>Wed</span>
+                            </label>
+                            <label class="day-checkbox">
+                                <input type="checkbox" name="days" value="Thursday"> <span>Thu</span>
+                            </label>
+                            <label class="day-checkbox">
+                                <input type="checkbox" name="days" value="Friday"> <span>Fri</span>
+                            </label>
+                            <label class="day-checkbox">
+                                <input type="checkbox" name="days" value="Saturday"> <span>Sat</span>
+                            </label>
+                            <label class="day-checkbox">
+                                <input type="checkbox" name="days" value="Sunday"> <span>Sun</span>
+                            </label>
+                            <button type="button" onclick="selectAllDays()" class="back-btn"
+                                style="padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-left: auto;">All</button>
+                        </div>
+                    </div>
+
+                    <div class="grid-2-col" style="margin-top: 1.5rem;">
+                        <div class="form-group">
+                            <label for="start-time">Start</label>
+                            <input type="time" id="start-time" step="1" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="end-time">End</label>
+                            <input type="time" id="end-time" step="1" class="form-control" required>
+                        </div>
+                    </div>
+
+
+
+                    <div class="form-section-title">Power Goals</div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label>Mode</label>
+                        <small class="text-secondary" id="power-help-text"
+                            style="font-size: 0.8rem; color: var(--text-secondary);">[Set positive power]</small>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                            <label><input type="radio" name="powerMode" value="charge" checked
+                                    onclick="updatePowerInputs()"> Charge</label>
+                            <label><input type="radio" name="powerMode" value="discharge" onclick="updatePowerInputs()">
+                                Discharge</label>
+                            <label><input type="radio" name="powerMode" value="balance" onclick="updatePowerInputs()">
+                                Balance</label>
+                            <label><input type="radio" name="powerMode" value="range" onclick="updatePowerInputs()">
+                                Usage Range</label>
+                        </div>
+                    </div>
+
+                    <!-- Single Power Input (Charge/Discharge) -->
+                    <!-- Combined Power Input Row -->
+                    <div class="grid-2-col">
+                        <!-- Single Power Input (Charge/Discharge) -->
+                        <div id="single-power-input" class="form-group transition-opacity">
+                            <label for="target-power">Power Target (W)</label>
+                            <input type="number" id="target-power" class="form-control" placeholder="e.g. 5000">
+                        </div>
+
+                        <!-- Quick Range Buttons (Moved here) -->
+                        <div id="quick-range-container" class="form-group transition-opacity">
+                            <label style="font-size: 0.8rem; color: var(--text-secondary);">Quick Range (Jumper
+                                Level)</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button type="button" onclick="setRange(1000)" class="nav-btn"
+                                    style="padding: 0.3rem 0.8rem; font-size: 0.8rem;">±1kW</button>
+                                <button type="button" onclick="setRange(10000)" class="nav-btn"
+                                    style="padding: 0.3rem 0.8rem; font-size: 0.8rem;">±10kW</button>
+                                <button type="button" onclick="setRange(100000)" class="nav-btn"
+                                    style="padding: 0.3rem 0.8rem; font-size: 0.8rem;">±100kW</button>
+                            </div>
+                        </div> 
+                        
+                    </div>
+
+                    <!-- Range Power Inputs (Min/Max) -->
+                    <div id="range-power-inputs" class="grid-2-col transition-opacity">
+                        <div class="form-group">
+                            <label for="min-power-goal">Valley Power (W)</label>
+                            <input type="number" id="min-power-goal" class="form-control" placeholder="e.g. -5000">
+                        </div>
+                        <div class="form-group">
+                            <label for="max-power-goal">Peak Power (W)</label>
+                            <input type="number" id="max-power-goal" class="form-control" placeholder="e.g. 5000">
+                        </div>
+                    </div>
+
+
+                    <div class="grid-2-col" style="margin-top: 1.5rem;">
+                        <div class="form-group">
+                            <label for="export-min-soc-constraint">Min Battery SOC (%)</label>
+                            <input type="number" id="export-min-soc-constraint" class="form-control"
+                                placeholder="e.g. 20">
+                        </div>
+                        <div class="form-group">
+                            <label for="import-max-soc-constraint">Max Battery SOC (%)</label>
+                            <input type="number" id="import-max-soc-constraint" class="form-control"
+                                placeholder="e.g. 80">
+                        </div>
+                    </div>
+
+                    <div class="form-actions"
+                        style="margin-top: 2rem; display: flex; flex-direction: column; gap: 1rem;">
+                        <button type="submit" class="back-btn btn-lg btn-block"
+                            style="background: var(--accent-cyan); color: white; border: none; padding: 1rem; font-size: 1.1rem; border-radius: 12px;">
+                            <i class="fa-solid fa-save"></i> <span id="save-btn-text">Save Time Slot</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Edit Power Constraints -->
+    <div id="constraints-modal" class="glass-modal-overlay" style="z-index: 2000;">
+        <div class="card modal-content"
+            style="width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; background: var(--bg-card); padding: 0;">
+            <div class="card-header" style="margin: 0; padding: 1rem 1.5rem;">
+                <div class="card-title">
+                    <i class="fa-solid fa-bolt card-icon"></i>
+                    <span>Edit Power Constraints</span>
+                </div>
+                <button onclick="closeConstraintsModal()" class="close-modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div style="padding: 1.5rem;">
+                <form id="constraints-form" onsubmit="saveConstraints(event)">
+                    <div class="form-section-title">Circuit Breaker Constraints</div>
+                    <div class="grid-2-col">
+                        <div class="form-group">
+                            <label for="global-min-power-constraint">Export Limit (W)</label>
+                            <input type="number" id="global-min-power-constraint" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="global-max-power-constraint">Import Limit (W)</label>
+                            <input type="number" id="global-max-power-constraint" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-section-title">G100 Power Constraints</div>
+                    <div class="grid-2-col">
+                        <div class="form-group">
+                            <label for="global-min-power-limit">Export Limit (W)</label>
+                            <input type="number" id="global-min-power-limit" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="global-max-power-limit">Import Limit (W)</label>
+                            <input type="number" id="global-max-power-limit" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-actions"
+                        style="margin-top: 2rem; display: flex; flex-direction: column; gap: 1rem;">
+                        <button type="submit" class="back-btn btn-lg btn-block"
+                            style="background: var(--bg-dark); color: var(--accent-cyan); border: 1px solid var(--border-color);">
+                            <i class="fa-solid fa-save"></i> Save Global Constraints
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Smart Power Control Modal -->
+    <div id="smart-control-modal" class="glass-modal-overlay" style="z-index: 2001;">
+        <div class="card modal-content"
+            style="width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; background: var(--bg-card); padding: 0;">
+            <div class="card-header" style="margin: 0; padding: 1rem 1.5rem;">
+                <div class="card-title">
+                    <i class="fa-solid fa-microchip card-icon"></i>
+                    <span>Edit Smart Power Control</span>
+                </div>
+                <button onclick="closeSmartControlModal()" class="close-modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div style="padding: 1.5rem;">
+                <form id="smart-control-form" onsubmit="saveSmartControl(event)">
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3rem; margin: 0.5rem 0 0.9rem;">
+                        <div class="form-section-title" style="margin: 0; border-bottom: none; padding-bottom: 0;">Power
+                            Factor</div>
+                        <label for="spc-power-factor-improver-enabled"
+                            style="display: flex; align-items: center; cursor: pointer; margin: 0;">
+                            <span id="spc-power-factor-improver-enabled-label"
+                                style="margin-right: 0.5rem;">Disabled</span>
+                            <input type="checkbox" id="spc-power-factor-improver-enabled">
+                        </label>
+                    </div>
+
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3rem; margin: 1.1rem 0 0.9rem;">
+                        <div class="form-section-title" style="margin: 0; border-bottom: none; padding-bottom: 0;">
+                            Ramping Charge Power</div>
+                        <label for="spc-ramping-charge-power-enabled"
+                            style="display: flex; align-items: center; cursor: pointer; margin: 0;">
+                            <span id="spc-ramping-charge-power-enabled-label"
+                                style="margin-right: 0.5rem;">Disabled</span>
+                            <input type="checkbox" id="spc-ramping-charge-power-enabled">
+                        </label>
+                    </div>
+                    <div class="grid-2-col">
+                        <div class="form-group">
+                            <label for="spc-ramping-charge-power-soc">Ramping Start SOC (%)</label>
+                            <input type="number" id="spc-ramping-charge-power-soc" class="form-control" min="0"
+                                max="100" value="90">
+                        </div>
+                    </div>
+
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3rem; margin: 1.1rem 0 0.9rem;">
+                        <div class="form-section-title" style="margin: 0; border-bottom: none; padding-bottom: 0;">
+                            Battery Voltage Protection</div>
+                        <label for="spc-battery-voltage-protection-enabled"
+                            style="display: flex; align-items: center; cursor: pointer; margin: 0;">
+                            <span id="spc-battery-voltage-protection-enabled-label"
+                                style="margin-right: 0.5rem;">Disabled</span>
+                            <input type="checkbox" id="spc-battery-voltage-protection-enabled">
+                        </label>
+                    </div>
+                    <div class="grid-2-col">
+                        <div class="form-group">
+                            <label for="spc-max-battery-cell-voltage">Max Cell Voltage (V)</label>
+                            <input type="number" id="spc-max-battery-cell-voltage" class="form-control" step="0.01"
+                                value="3.6">
+                        </div>
+                        <div class="form-group">
+                            <label for="spc-min-battery-cell-voltage">Min Cell Voltage (V)</label>
+                            <input type="number" id="spc-min-battery-cell-voltage" class="form-control" step="0.01"
+                                value="2.8">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="spc-max-cell-voltage-diff">Max Cell Voltage Difference (V)</label>
+                        <input type="number" id="spc-max-cell-voltage-diff" class="form-control" step="0.01" min="0"
+                            max="0.99" value="0.15">
+                    </div>
+
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3rem; margin: 1.1rem 0 0.9rem;">
+                        <div class="form-section-title" style="margin: 0; border-bottom: none; padding-bottom: 0;">
+                            Battery Temperature Protection</div>
+                        <label for="spc-battery-temp-protection-enabled"
+                            style="display: flex; align-items: center; cursor: pointer; margin: 0;">
+                            <span id="spc-battery-temp-protection-enabled-label"
+                                style="margin-right: 0.5rem;">Disabled</span>
+                            <input type="checkbox" id="spc-battery-temp-protection-enabled">
+                        </label>
+                    </div>
+                    <div class="grid-2-col">
+                        <div class="form-group">
+                            <label for="spc-max-battery-cell-temp">Max Cell Temperature (°C)</label>
+                            <input type="number" id="spc-max-battery-cell-temp" class="form-control" value="55">
+                        </div>
+                        <div class="form-group">
+                            <label for="spc-min-battery-cell-temp">Min Cell Temperature (°C)</label>
+                            <input type="number" id="spc-min-battery-cell-temp" class="form-control" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="spc-max-cell-temp-diff">Max Cell Temperature Difference (°C)</label>
+                        <input type="number" id="spc-max-cell-temp-diff" class="form-control" min="0" step="1"
+                            value="5">
+                    </div>
+
+                    <div class="form-actions"
+                        style="margin-top: 2rem; display: flex; flex-direction: column; gap: 1rem;">
+                        <button type="submit" class="back-btn btn-lg btn-block"
+                            style="background: var(--bg-dark); color: var(--accent-cyan); border: 1px solid var(--border-color);">
+                            <i class="fa-solid fa-save"></i> Save Smart Control Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE ---
+        // Declare all global variables at the top to avoid ReferenceErrors (TDZ)
+        let currentUser = { username: 'unknown', role: 'user' };
+        let timeSlots = [];
+        let globalConstraints = {
+            minPowerConstraint: null,
+            maxPowerConstraint: null,
+            minPowerLimit: null,
+            maxPowerLimit: null,
+            // Smart Power Control settings
+            powerFactorImproverEnabled: false,
+            rampingChargePowerEnabled: false,
+            rampingChargePowerSoC: 90,
+            batteryHighLowVoltageProtectionEnabled: false,
+            batteryHighLowTempProtectionEnabled: false,
+            maxBatteryCellVoltage: 3.6,
+            minBatteryCellVoltage: 2.8,
+            maxCellVoltageDiff: 0.15,
+            maxBatteryCellTemp: 55,
+            minBatteryCellTemp: 0,
+            maxCellTempDiff: 5
+        };
+        let addSlotDraftState = null;
+        let isSaving = false;
+
+        // Initialize socket to a no-op shim IMMEDIATELY to prevent "Cannot read properties of null (reading 'on')"
+        let socket = { on: () => { }, emit: () => { }, off: () => { }, close: () => { } };
+
+        // --- INITIALIZATION ---
+
+        // Fetch current user info
+        async function fetchUserInfo() {
+            try {
+                const response = await fetch('/api/me');
+                if (response.ok) {
+                    currentUser = await response.json();
+                    applyRolePermissions();
+                }
+            } catch (error) {
+                console.error('Error fetching user info:', error);
+            }
+        }
+
+        // Apply role-based visibility
+        function applyRolePermissions() {
+            const editBtnContainer = document.getElementById('edit-constraints-btn-container');
+            const editSmartControlBtnContainer = document.getElementById('edit-smart-control-btn-container');
+            const addSlotBtnContainer = document.getElementById('add-slot-btn-container');
+            const isAdmin = currentUser && currentUser.role === 'admin';
+
+            if (editBtnContainer) editBtnContainer.style.display = isAdmin ? 'block' : 'none';
+            if (editSmartControlBtnContainer) editSmartControlBtnContainer.style.display = isAdmin ? 'block' : 'none';
+            //if (addSlotBtnContainer) addSlotBtnContainer.style.display = isAdmin ? 'block' : 'none';
+
+            // Admin notice for users when constraints are missing
+            const adminNotice = document.getElementById('admin-notice');
+            if (adminNotice) {
+                const constraintsMissing = globalConstraints.minPowerConstraint === null || globalConstraints.minPowerConstraint === undefined;
+                adminNotice.style.display = (!isAdmin && constraintsMissing) ? 'flex' : 'none';
+            }
+
+            // Update profile badge
+            const displayName = document.getElementById('user-display-name');
+            const roleIcon = document.getElementById('user-role-icon');
+            if (displayName && currentUser) {
+                displayName.textContent = currentUser.username || '...';
+            }
+            if (roleIcon && currentUser) {
+                roleIcon.style.color = isAdmin ? 'var(--accent-amber)' : 'var(--accent-cyan)';
+            }
+        }
+
+        // Initialize socket (probe + load if available).
+        async function initSocket() {
+            try {
+                const client = await createSocketClient();
+
+                if (client) {
+                    socket = client;
+
+                    socket.on('connect', () => {
+                        console.log('Connected to WebSocket');
+                        $('#connection-status').removeClass('status-disconnected').addClass('status-normal').text('System Online');
+                    });
+
+                    socket.on('disconnect', () => {
+                        console.log('Disconnected from WebSocket');
+                        $('#connection-status').removeClass('status-normal').addClass('status-offline').text('System Offline');
+                    });
+
+                    socket.on('initial_slots', (data) => {
+                        timeSlots = data;
+                        updateGlobalConstraintsFromSlots();
+                        renderPowerConstraints();
+                        renderSlots();
+                    });
+
+                    socket.on('timeslots_update', (data) => {
+                        timeSlots = data;
+                        updateGlobalConstraintsFromSlots();
+                        renderPowerConstraints();
+                        renderSlots();
+                    });
+                }
+            } catch (err) {
+                console.error('Socket initialization failed:', err);
+            }
+        }
+
+        // Run initializations after all functions and variables are defined
+        document.addEventListener('DOMContentLoaded', () => {
+            initSocket();
+            fetchUserInfo();
+            loadInitialData();
+
+            const spcCheckboxIds = [
+                'spc-power-factor-improver-enabled',
+                'spc-ramping-charge-power-enabled',
+                'spc-battery-voltage-protection-enabled',
+                'spc-battery-temp-protection-enabled'
+            ];
+            spcCheckboxIds.forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('change', updateSmartControlEnabledLabels);
+                }
+            });
+            updateSmartControlEnabledLabels();
+        });
+
+        // Load initial data from API when page loads
+        async function loadInitialData() {
+            try {
+                // Use Promise.allSettled to handle timeslots and SPC independently
+                // so SPC failure doesn't prevent timeslots from rendering
+                const [slotsResult, spcResult] = await Promise.allSettled([
+                    fetch('/api/timeslots'),
+                    fetch('/api/smart-power-control')
+                ]);
+
+                // Process timeslots (required)
+                if (slotsResult.status === 'fulfilled' && slotsResult.value.ok) {
+                    const slotsData = await slotsResult.value.json();
+                    timeSlots = slotsData;
+                    updateGlobalConstraintsFromSlots();
+                } else {
+                    console.error('Failed to load timeslots:',
+                        slotsResult.status === 'rejected' ? slotsResult.reason : `HTTP ${slotsResult.value.status}`);
+                }
+
+                // Process Smart Power Control (optional, graceful fallback)
+                if (spcResult.status === 'fulfilled' && spcResult.value.ok) {
+                    try {
+                        const spcData = await spcResult.value.json();
+                        if (spcData && spcData.smartPowerControl) {
+                            const spc = spcData.smartPowerControl;
+                            globalConstraints.powerFactorImproverEnabled = !!spc.powerFactorImproverEnabled;
+                            globalConstraints.rampingChargePowerEnabled = !!spc.rampingChargePowerEnabled;
+                            globalConstraints.rampingChargePowerSoC = spc.rampingChargePowerSoC ?? 90;
+                            globalConstraints.batteryHighLowVoltageProtectionEnabled = !!spc.batteryHighLowVoltageProtectionEnabled;
+                            globalConstraints.batteryHighLowTempProtectionEnabled = !!spc.batteryHighLowTempProtectionEnabled;
+                            globalConstraints.maxBatteryCellVoltage = spc.maxBatteryCellVoltage ?? 3.6;
+                            globalConstraints.minBatteryCellVoltage = spc.minBatteryCellVoltage ?? 2.8;
+                            globalConstraints.maxCellVoltageDiff = spc.maxCellVoltageDiff ?? 0.15;
+                            globalConstraints.maxBatteryCellTemp = spc.maxBatteryCellTemp ?? 55;
+                            globalConstraints.minBatteryCellTemp = spc.minBatteryCellTemp ?? 0;
+                            globalConstraints.maxCellTempDiff = spc.maxCellTempDiff ?? 5;
+                        }
+                    } catch (jsonError) {
+                        console.warn('Failed to parse Smart Power Control data:', jsonError);
+                    }
+                } else {
+                    const reason = spcResult.status === 'rejected' ? spcResult.reason : `HTTP ${spcResult.value.status}`;
+                    console.warn('Smart Power Control unavailable, using defaults:', reason);
+                }
+
+                renderPowerConstraints();
+                renderSmartControlDisplay();
+                renderSlots();
+            } catch (error) {
+                console.error('Error during initial data load:', error);
+            }
+        }
+
+        // Enforce input signs
+        document.addEventListener('DOMContentLoaded', () => {
+            const targetPowerInput = document.getElementById('target-power');
+            if (targetPowerInput) {
+                targetPowerInput.addEventListener('input', function (e) {
+                    const mode = document.querySelector('input[name="powerMode"]:checked').value;
+                    let val = parseInt(e.target.value);
+
+                    if (isNaN(val)) return;
+
+                    if (mode === 'charge') {
+                        if (val < 0) e.target.value = Math.abs(val);
+                    } else if (mode === 'discharge') {
+                        if (val > 0) e.target.value = -Math.abs(val);
+                    }
+                });
+            }
+        });
+
+        function updateGlobalConstraintsFromSlots() {
+            if (timeSlots.length > 0) {
+                // Get latest slot (last in list)
+                const latest = timeSlots[timeSlots.length - 1];
+                const state = latest.timeslot ? (latest.timeslot.desiredState || latest.timeslot) : (latest.desiredState || latest);
+
+                if (state) {
+                    globalConstraints.minPowerConstraint = state.minPowerConstraint !== undefined ? state.minPowerConstraint : -15000;
+                    globalConstraints.maxPowerConstraint = state.maxPowerConstraint !== undefined ? state.maxPowerConstraint : 15000;
+                    globalConstraints.minPowerLimit = state.minPowerLimit !== undefined ? state.minPowerLimit : -15000;
+                    globalConstraints.maxPowerLimit = state.maxPowerLimit !== undefined ? state.maxPowerLimit : 15000;
+                }
+            }
+        }
+
+        // Modal Functions
+        function openAddModal() {
+            // Restore draft state or defaults for Add mode
+            if (!addSlotDraftState) {
+                // First time or after save: Defaults
+                resetForm();
+            } else {
+                // Restore logic
+                restoreAddSlotDraft();
+            }
+
+            // Set title and button for Add mode specifically
+            document.getElementById('form-title').textContent = "Add New Slot";
+            document.getElementById('save-btn-text').textContent = "Save Time Slot";
+            document.getElementById('edit-stream-id').value = "";
+            document.getElementById('slot-logical-id').value = "";
+
+            document.getElementById('slot-modal').classList.add('active');
+            updatePowerInputs();
+        }
+
+        function closeModal() {
+            // If we are in Add mode (no edit-stream-id), save draft
+            const editId = document.getElementById('edit-stream-id').value;
+            if (!editId) {
+                saveAddSlotDraft();
+            }
+            document.getElementById('slot-modal').classList.remove('active');
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            const slotModal = document.getElementById('slot-modal');
+            const constraintsModal = document.getElementById('constraints-modal');
+            const smartControlModal = document.getElementById('smart-control-modal');
+            if (event.target == slotModal) {
+                closeModal();
+            }
+            if (event.target == constraintsModal) {
+                closeConstraintsModal();
+            }
+            if (event.target == smartControlModal) {
+                closeSmartControlModal();
+            }
+        }
+
+        // Constraints Modal Functions
+        function openConstraintsModal() {
+            document.getElementById('global-min-power-constraint').value = globalConstraints.minPowerConstraint !== null ? globalConstraints.minPowerConstraint : -15000;
+            document.getElementById('global-max-power-constraint').value = globalConstraints.maxPowerConstraint !== null ? globalConstraints.maxPowerConstraint : 15000;
+            document.getElementById('global-min-power-limit').value = globalConstraints.minPowerLimit !== null ? globalConstraints.minPowerLimit : -15000;
+            document.getElementById('global-max-power-limit').value = globalConstraints.maxPowerLimit !== null ? globalConstraints.maxPowerLimit : 15000;
+
+            document.getElementById('constraints-modal').classList.add('active');
+        }
+
+        function closeConstraintsModal() {
+            document.getElementById('constraints-modal').classList.remove('active');
+        }
+
+        function renderPowerConstraints() {
+            document.getElementById('disp-min-power-constraint').textContent = globalConstraints.minPowerConstraint !== null ? globalConstraints.minPowerConstraint + " W" : "Not Set";
+            document.getElementById('disp-max-power-constraint').textContent = globalConstraints.maxPowerConstraint !== null ? globalConstraints.maxPowerConstraint + " W" : "Not Set";
+            document.getElementById('disp-min-power-limit').textContent = globalConstraints.minPowerLimit !== null ? globalConstraints.minPowerLimit + " W" : "Not Set";
+            document.getElementById('disp-max-power-limit').textContent = globalConstraints.maxPowerLimit !== null ? globalConstraints.maxPowerLimit + " W" : "Not Set";
+
+            // Re-evaluate role permissions (e.g. to show/hide admin notice)
+            applyRolePermissions();
+        }
+
+        // Smart Power Control Modal Functions
+        function openSmartControlModal() {
+            // Populate form fields with current values (use ?? to preserve 0 values)
+            document.getElementById('spc-power-factor-improver-enabled').checked = globalConstraints.powerFactorImproverEnabled ?? false;
+            document.getElementById('spc-ramping-charge-power-enabled').checked = globalConstraints.rampingChargePowerEnabled ?? false;
+            document.getElementById('spc-ramping-charge-power-soc').value = globalConstraints.rampingChargePowerSoC ?? 90;
+            document.getElementById('spc-battery-voltage-protection-enabled').checked = globalConstraints.batteryHighLowVoltageProtectionEnabled ?? false;
+            document.getElementById('spc-battery-temp-protection-enabled').checked = globalConstraints.batteryHighLowTempProtectionEnabled ?? false;
+            document.getElementById('spc-max-battery-cell-voltage').value = globalConstraints.maxBatteryCellVoltage ?? 3.6;
+            document.getElementById('spc-min-battery-cell-voltage').value = globalConstraints.minBatteryCellVoltage ?? 2.8;
+            document.getElementById('spc-max-cell-voltage-diff').value = globalConstraints.maxCellVoltageDiff ?? 0.15;
+            document.getElementById('spc-max-battery-cell-temp').value = globalConstraints.maxBatteryCellTemp ?? 55;
+            document.getElementById('spc-min-battery-cell-temp').value = globalConstraints.minBatteryCellTemp ?? 0;
+            document.getElementById('spc-max-cell-temp-diff').value = globalConstraints.maxCellTempDiff ?? 5;
+
+            updateSmartControlEnabledLabels();
+
+            document.getElementById('smart-control-modal').classList.add('active');
+        }
+
+        function updateSmartControlEnabledLabels() {
+            const mapping = [
+                ['spc-power-factor-improver-enabled', 'spc-power-factor-improver-enabled-label'],
+                ['spc-ramping-charge-power-enabled', 'spc-ramping-charge-power-enabled-label'],
+                ['spc-battery-voltage-protection-enabled', 'spc-battery-voltage-protection-enabled-label'],
+                ['spc-battery-temp-protection-enabled', 'spc-battery-temp-protection-enabled-label']
+            ];
+
+            mapping.forEach(([inputId, labelId]) => {
+                const input = document.getElementById(inputId);
+                const label = document.getElementById(labelId);
+                if (input && label) {
+                    label.textContent = input.checked ? 'Enabled' : 'Disabled';
+                }
+            });
+        }
+
+        function closeSmartControlModal() {
+            document.getElementById('smart-control-modal').classList.remove('active');
+        }
+
+        function renderSmartControlDisplay() {
+            // Update status badges
+            const pfStatus = globalConstraints.powerFactorImproverEnabled ? 'Enabled' : 'Disabled';
+            const rampingStatus = globalConstraints.rampingChargePowerEnabled ? 'Enabled' : 'Disabled';
+            const voltageStatus = globalConstraints.batteryHighLowVoltageProtectionEnabled ? 'Enabled' : 'Disabled';
+            const tempStatus = globalConstraints.batteryHighLowTempProtectionEnabled ? 'Enabled' : 'Disabled';
+
+            document.getElementById('disp-pf-improver-status').textContent = pfStatus;
+            document.getElementById('disp-pf-improver-status').className = 'status-badge ' + (globalConstraints.powerFactorImproverEnabled ? 'status-normal' : '');
+
+            document.getElementById('disp-ramping-status').textContent = rampingStatus;
+            document.getElementById('disp-ramping-status').className = 'status-badge ' + (globalConstraints.rampingChargePowerEnabled ? 'status-normal' : '');
+            document.getElementById('disp-ramping-soc').textContent = (globalConstraints.rampingChargePowerSoC ?? 90) + '%';
+
+            document.getElementById('disp-voltage-protection-status').textContent = voltageStatus;
+            document.getElementById('disp-voltage-protection-status').className = 'status-badge ' + (globalConstraints.batteryHighLowVoltageProtectionEnabled ? 'status-normal' : '');
+            document.getElementById('disp-max-cell-voltage').textContent = (globalConstraints.maxBatteryCellVoltage ?? 3.6) + 'V';
+            document.getElementById('disp-min-cell-voltage').textContent = (globalConstraints.minBatteryCellVoltage ?? 2.8) + 'V';
+            document.getElementById('disp-voltage-diff').textContent = (globalConstraints.maxCellVoltageDiff ?? 0.15) + 'V';
+
+            document.getElementById('disp-temp-protection-status').textContent = tempStatus;
+            document.getElementById('disp-temp-protection-status').className = 'status-badge ' + (globalConstraints.batteryHighLowTempProtectionEnabled ? 'status-normal' : '');
+            document.getElementById('disp-max-cell-temp').textContent = (globalConstraints.maxBatteryCellTemp ?? 55) + '°C';
+            document.getElementById('disp-min-cell-temp').textContent = (globalConstraints.minBatteryCellTemp ?? 0) + '°C';
+            document.getElementById('disp-temp-diff').textContent = (globalConstraints.maxCellTempDiff ?? 5) + '°C';
+        }
+
+        function saveSmartControl(event) {
+            event.preventDefault();
+
+            // Backup current state before any changes (for rollback on failure)
+            const previousConstraints = JSON.parse(JSON.stringify(globalConstraints));
+
+            // Save Smart Power Control settings (use Number.isFinite() to preserve 0 values)
+            globalConstraints.powerFactorImproverEnabled = document.getElementById('spc-power-factor-improver-enabled').checked;
+            globalConstraints.rampingChargePowerEnabled = document.getElementById('spc-ramping-charge-power-enabled').checked;
+            const rampSocVal = parseInt(document.getElementById('spc-ramping-charge-power-soc').value);
+            globalConstraints.rampingChargePowerSoC = Number.isFinite(rampSocVal) ? rampSocVal : 90;
+            globalConstraints.batteryHighLowVoltageProtectionEnabled = document.getElementById('spc-battery-voltage-protection-enabled').checked;
+            globalConstraints.batteryHighLowTempProtectionEnabled = document.getElementById('spc-battery-temp-protection-enabled').checked;
+            const maxVoltVal = parseFloat(document.getElementById('spc-max-battery-cell-voltage').value);
+            globalConstraints.maxBatteryCellVoltage = Number.isFinite(maxVoltVal) ? maxVoltVal : 3.6;
+            const minVoltVal = parseFloat(document.getElementById('spc-min-battery-cell-voltage').value);
+            globalConstraints.minBatteryCellVoltage = Number.isFinite(minVoltVal) ? minVoltVal : 2.8;
+            const voltDiffVal = parseFloat(document.getElementById('spc-max-cell-voltage-diff').value);
+            globalConstraints.maxCellVoltageDiff = Number.isFinite(voltDiffVal) ? voltDiffVal : 0.15;
+            const maxTempVal = parseInt(document.getElementById('spc-max-battery-cell-temp').value);
+            globalConstraints.maxBatteryCellTemp = Number.isFinite(maxTempVal) ? maxTempVal : 55;
+            const minTempVal = parseInt(document.getElementById('spc-min-battery-cell-temp').value);
+            globalConstraints.minBatteryCellTemp = Number.isFinite(minTempVal) ? minTempVal : 0;
+            const tempDiffVal = parseInt(document.getElementById('spc-max-cell-temp-diff').value);
+            globalConstraints.maxCellTempDiff = Number.isFinite(tempDiffVal) ? tempDiffVal : 5;
+
+            // Send to backend to persist in Redis key "smart_power_control" (not a stream)
+            const payload = {
+                smartPowerControl: {
+                    id: Date.now(),
+                    powerFactorImproverEnabled: globalConstraints.powerFactorImproverEnabled,
+                    rampingChargePowerEnabled: globalConstraints.rampingChargePowerEnabled,
+                    rampingChargePowerSoC: globalConstraints.rampingChargePowerSoC,
+                    batteryHighLowVoltageProtectionEnabled: globalConstraints.batteryHighLowVoltageProtectionEnabled,
+                    batteryHighLowTempProtectionEnabled: globalConstraints.batteryHighLowTempProtectionEnabled,
+                    maxBatteryCellVoltage: globalConstraints.maxBatteryCellVoltage,
+                    minBatteryCellVoltage: globalConstraints.minBatteryCellVoltage,
+                    maxCellVoltageDiff: globalConstraints.maxCellVoltageDiff,
+                    maxBatteryCellTemp: globalConstraints.maxBatteryCellTemp,
+                    minBatteryCellTemp: globalConstraints.minBatteryCellTemp,
+                    maxCellTempDiff: globalConstraints.maxCellTempDiff,
+                    timestamp: new Date().toISOString()
+                }
+            };
+
+            fetch('/api/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        // Try to extract a meaningful error message from the response body (if any)
+                        return response.text().then(text => {
+                            const message = text && text.trim().length > 0
+                                ? text
+                                : 'Request failed with status ' + response.status + ' ' + response.statusText;
+                            throw new Error(message);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        console.log('Smart Power Control settings saved to backend:', globalConstraints);
+                        // Only update UI after successful backend save
+                        renderSmartControlDisplay();
+                        closeSmartControlModal();
+                    } else {
+                        // Rollback state on error
+                        Object.assign(globalConstraints, previousConstraints);
+                        alert('Error saving Smart Power Control: ' + (data.message || 'Unknown error'));
+                        console.error('Failed to save Smart Power Control:', data);
+                    }
+                })
+                .catch(err => {
+                    // Rollback state on network/parse error
+                    Object.assign(globalConstraints, previousConstraints);
+                    console.error('Error saving Smart Power Control:', err);
+                    alert('Error saving Smart Power Control: ' + err.message);
+                });
+        }
+
+        function saveConstraints(event) {
+            event.preventDefault();
+
+            // Update local state
+            const minC = parseInt(document.getElementById('global-min-power-constraint').value);
+            const maxC = parseInt(document.getElementById('global-max-power-constraint').value);
+            const minL = parseInt(document.getElementById('global-min-power-limit').value);
+            const maxL = parseInt(document.getElementById('global-max-power-limit').value);
+
+            if (isNaN(minC) || isNaN(maxC) || isNaN(minL) || isNaN(maxL)) {
+                alert("Please enter valid numbers for all constraints.");
+                return;
+            }
+
+            globalConstraints.minPowerConstraint = minC;
+            globalConstraints.maxPowerConstraint = maxC;
+            globalConstraints.minPowerLimit = minL;
+            globalConstraints.maxPowerLimit = maxL;
+
+            // If we have slots, update the latest one
+            if (timeSlots.length > 0) {
+                const latestSlot = timeSlots[timeSlots.length - 1];
+                const tsData = latestSlot.timeslot || latestSlot;
+                const currentState = tsData.desiredState || tsData;
+
+                // Merge current state with new constraints
+                const newState = {
+                    ...currentState,
+                    ...globalConstraints
+                };
+
+                // Reuse logic similar to saveSlot but targeting existing slot
+                const payload = {
+                    timeslot: {
+                        ...tsData, // Keep all other fields
+                        desiredState: newState
+                    },
+                    stream_id: latestSlot.stream_id // EDIT mode
+                };
+
+                fetch('/api/publish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Optimistic update handled by socket usually, but let's re-render
+                            renderPowerConstraints();
+                            closeConstraintsModal();
+                        } else {
+                            alert('Error saving constraints: ' + data.message);
+                        }
+                    });
+            } else {
+                // No slots exists, just keep in memory for next slot creation
+                renderPowerConstraints();
+                closeConstraintsModal();
+                alert("Constraints saved (will be applied to next created slot)");
+            }
+        }
+
+        function saveSlot(event) {
+            event.preventDefault();
+
+            // Collect days
+            const selectedDays = Array.from(document.querySelectorAll('input[name="days"]:checked')).map(cb => cb.value);
+            if (selectedDays.length === 0) {
+                alert("Please select at least one day.");
+                return;
+            }
+
+            // check global constraints are set
+            if (globalConstraints.minPowerConstraint === null || isNaN(globalConstraints.minPowerConstraint)) {
+                alert("Global Power Constraints are not set. Please set them first.");
+                openConstraintsModal();
+                return;
+            }
+
+            // Determine Power Goals based on Mode
+            const mode = document.querySelector('input[name="powerMode"]:checked').value;
+            let minPowerGoalVal = 0;
+            let maxPowerGoalVal = 0;
+
+            if (mode === 'balance') {
+                minPowerGoalVal = 0;
+                maxPowerGoalVal = 0;
+            } else if (mode === 'range') {
+                minPowerGoalVal = parseInt(document.getElementById('min-power-goal').value) || 0;
+                maxPowerGoalVal = parseInt(document.getElementById('max-power-goal').value) || 0;
+            } else {
+                // Charge or Discharge - Value already signed based on UI enforcement
+                let val = parseInt(document.getElementById('target-power').value) || 0;
+
+                // Double check / safeguard logic
+                if (mode === 'charge') val = Math.abs(val);
+                if (mode === 'discharge') val = -Math.abs(val);
+
+                minPowerGoalVal = val;
+                maxPowerGoalVal = val;
+            }
+
+            // Get SOC values
+            const exportMinSocConstraintVal = parseInt(document.getElementById('export-min-soc-constraint').value) || 20;
+            const importMaxSocConstraintVal = parseInt(document.getElementById('import-max-soc-constraint').value) || 100;
+
+            const logicalId = document.getElementById('slot-logical-id').value ? parseInt(document.getElementById('slot-logical-id').value) : Date.now(); // ID as int/timestamp
+            const editStreamId = document.getElementById('edit-stream-id').value || null;
+
+            // Format time as HH:mm:ss
+            let startTime = document.getElementById('start-time').value;
+            let endTime = document.getElementById('end-time').value;
+
+            //if (startTime.length === 5) startTime += ":00";
+            //if (endTime.length === 5) endTime += ":00";
+
+            if (startTime >= endTime) {
+                alert("Start Time must be less than End Time.");
+                return;
+            }
+
+            const desiredState = {
+                minPowerGoal: minPowerGoalVal,
+                maxPowerGoal: maxPowerGoalVal,
+                exportMinSocConstraint: exportMinSocConstraintVal,
+                importMaxSocConstraint: importMaxSocConstraintVal,
+                // Include Global Constraints
+                minPowerConstraint: globalConstraints.minPowerConstraint,
+                maxPowerConstraint: globalConstraints.maxPowerConstraint,
+                minPowerLimit: globalConstraints.minPowerLimit,
+                maxPowerLimit: globalConstraints.maxPowerLimit
+            };
+
+            // Construct final payload
+            const payload = {
+                timeslot: {
+                    id: logicalId,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: "2099-12-31",
+                    startTime: startTime,
+                    endTime: endTime,
+                    days: selectedDays,
+                    desiredState: desiredState
+                },
+                stream_id: editStreamId
+            };
+
+            // Send to backend via /api/publish
+            fetch('/api/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const newStreamId = data.stream_id || editStreamId;
+                        const newSlotEntry = {
+                            timeslot: payload.timeslot,
+                            stream_id: newStreamId
+                        };
+
+                        if (editStreamId) {
+                            // Find and replace existing slot
+                            const idx = timeSlots.findIndex(s => s.stream_id === editStreamId);
+                            if (idx !== -1) {
+                                timeSlots[idx] = newSlotEntry;
+                            }
+                        } else {
+                            // Add new slot
+                            timeSlots.push(newSlotEntry);
+                        }
+
+                        renderSlots();
+                        // Clear draft on successful save
+                        addSlotDraftState = null;
+                        closeModal();
+                    } else {
+                        alert('Error saving time slot: ' + data.message);
+                    }
+                })
+                .catch(err => console.error('Error:', err));
+        }
+
+        function editSlot(index) {
+            const slot = timeSlots[index];
+            const tsData = slot.timeslot || slot;
+
+            // Populate Form
+            document.getElementById('edit-stream-id').value = slot.stream_id || '';
+            document.getElementById('slot-logical-id').value = tsData.id || '';
+
+            // Handle Time (strip seconds for input[type=time])
+            let startTime = tsData.startTime || tsData.start || "";
+            let endTime = tsData.endTime || tsData.end || "";
+            //if (startTime.length > 5) startTime = startTime.substring(0, 5);
+            //if (endTime.length > 5) endTime = endTime.substring(0, 5);
+
+            document.getElementById('start-time').value = startTime;
+            document.getElementById('end-time').value = endTime;
+
+            // Handle Days
+            const days = tsData.days || [];
+            document.querySelectorAll('input[name="days"]').forEach(cb => {
+                cb.checked = days.includes(cb.value);
+            });
+
+            // Handle Desired State mapping (populate all fields)
+            const state = tsData.desiredState || tsData;
+
+            // Determine Mode from values
+            // Heuristic:
+            // If min == max == 0 -> Balance
+            // If min == max > 0 -> Charge
+            // If min == max < 0 -> Discharge
+            // Else -> Range
+            let mode = 'range';
+            const minP = state.minPowerGoal !== undefined ? state.minPowerGoal : 0;
+            const maxP = state.maxPowerGoal !== undefined ? state.maxPowerGoal : 0;
+
+            if (minP === 0 && maxP === 0) mode = 'balance';
+            else if (minP === maxP && minP > 0) mode = 'charge';
+            else if (minP === maxP && minP < 0) mode = 'discharge';
+            else mode = 'range';
+
+            document.querySelector(`input[name="powerMode"][value="${mode}"]`).checked = true;
+            updatePowerInputs();
+
+            if (mode === 'range') {
+                document.getElementById('min-power-goal').value = minP;
+                document.getElementById('max-power-goal').value = maxP;
+            } else if (mode === 'balance') {
+                // No inputs
+            } else {
+                // Display exactly what we have, sign depends on mode
+                document.getElementById('target-power').value = minP;
+            }
+
+            // Populate SOC constraint fields
+            document.getElementById('export-min-soc-constraint').value = state.exportMinSocConstraint !== undefined ? state.exportMinSocConstraint : 20;
+            document.getElementById('import-max-soc-constraint').value = state.importMaxSocConstraint !== undefined ? state.importMaxSocConstraint : 100;
+
+            document.getElementById('form-title').textContent = "Edit Slot";
+            document.getElementById('save-btn-text').textContent = "Update Time Slot";
+
+            document.getElementById('slot-modal').classList.add('active');
+        }
+
+        function setRange(val) {
+            const mode = document.querySelector('input[name="powerMode"]:checked').value;
+
+            if (mode === 'range') {
+                const minInput = document.getElementById('min-power-goal');
+                const maxInput = document.getElementById('max-power-goal');
+                let curMin = parseInt(minInput.value);
+                if (isNaN(curMin)) curMin = 0;
+                let curMax = parseInt(maxInput.value);
+                if (isNaN(curMax)) curMax = 0;
+
+                minInput.value = curMin - Math.abs(val);
+                maxInput.value = curMax + Math.abs(val);
+            } else if (mode === 'charge') {
+                const targetPower = document.getElementById('target-power');
+                let cur = parseInt(targetPower.value);
+                if (isNaN(cur)) cur = 0;
+                // Charge: Always positive. Add magnitude.
+                let newVal = cur + Math.abs(val);
+                targetPower.value = newVal;
+            } else if (mode === 'discharge') {
+                const targetPower = document.getElementById('target-power');
+                let cur = parseInt(targetPower.value);
+                if (isNaN(cur)) cur = 0;
+                // Discharge: Always negative. Subtract magnitude (e.g. -5000 -> -6000).
+                // Ensure we start with negative if user typed 0
+                if (cur === 0) cur = 0; // -0 is 0
+
+                // If current is positive for some reason (user error), make it negative first? 
+                // Currently input forces sign on input event, but programmatic set might key off existing.
+                // Logic: subtract absolute val.
+                let newVal = cur - Math.abs(val);
+                targetPower.value = newVal;
+            }
+        }
+
+        function updatePowerInputs() {
+            const mode = document.querySelector('input[name="powerMode"]:checked').value;
+            const singleInput = document.getElementById('single-power-input');
+            const rangeInputs = document.getElementById('range-power-inputs'); // Min/Max
+            const quickRangeContainer = document.getElementById('quick-range-container');
+
+            const targetPowerField = document.getElementById('target-power');
+            const minPowerField = document.getElementById('min-power-goal');
+            const maxPowerField = document.getElementById('max-power-goal');
+            const rangeButtons = quickRangeContainer.querySelectorAll('button');
+
+            // --- Reset Disabled States ---
+            singleInput.classList.remove('container-disabled');
+            quickRangeContainer.classList.remove('container-disabled');
+            rangeInputs.classList.remove('container-disabled');
+
+            targetPowerField.disabled = false;
+            minPowerField.disabled = false;
+            maxPowerField.disabled = false;
+            rangeButtons.forEach(b => b.disabled = false);
+
+            if (mode === 'charge') {
+                // Charge: Single Input (+ve), Disable Range Inputs but KEEP Buttons
+                // quickRangeContainer.classList.add('container-disabled'); // ENABLED
+                rangeInputs.classList.add('container-disabled');
+
+                minPowerField.disabled = true;
+                maxPowerField.disabled = true;
+                // rangeButtons.forEach(b => b.disabled = true); // ENABLED
+
+                targetPowerField.value = Math.abs(parseInt(targetPowerField.value) || 0);
+                document.getElementById('power-help-text').textContent = "[Set positive power]";
+
+            } else if (mode === 'discharge') {
+                // Discharge: Single Input (-ve), Disable Range Inputs but KEEP Buttons
+                // quickRangeContainer.classList.add('container-disabled'); // ENABLED
+                rangeInputs.classList.add('container-disabled');
+
+                minPowerField.disabled = true;
+                maxPowerField.disabled = true;
+                // rangeButtons.forEach(b => b.disabled = true); // ENABLED
+
+                let val = parseInt(targetPowerField.value) || 0;
+                targetPowerField.value = val > 0 ? -val : val;
+                document.getElementById('power-help-text').textContent = "[Set negative power]";
+
+            } else if (mode === 'balance') {
+                // Balance: Disable All
+                singleInput.classList.add('container-disabled');
+                targetPowerField.disabled = true;
+
+                quickRangeContainer.classList.add('container-disabled');
+                rangeInputs.classList.add('container-disabled');
+
+                minPowerField.disabled = true;
+                maxPowerField.disabled = true;
+                rangeButtons.forEach(b => b.disabled = true);
+
+                document.getElementById('power-help-text').textContent = "[Set power goal to 0]";
+
+            } else if (mode === 'range') {
+                // Range: Disable Single, Enable Range
+                singleInput.classList.add('container-disabled');
+                targetPowerField.disabled = true;
+
+                // Keep range inputs enabled (Remove classes not needed as we reset above)
+                document.getElementById('power-help-text').textContent = "[Set peak/valley power threshold]";
+            }
+        }
+
+        function deleteSlot(index) {
+            if (!confirm("Are you sure you want to delete this time slot?")) return;
+
+            const slot = timeSlots[index];
+            if (!slot.stream_id) {
+                alert("Error: Cannot delete slot without stream ID");
+                return;
+            }
+
+            fetch('/api/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 'delete_timeslot': slot.stream_id })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remove from local array and re-render immediately
+                        timeSlots.splice(index, 1);
+                        renderSlots();
+                    } else {
+                        alert('Error deleting slot: ' + data.message);
+                    }
+                })
+                .catch(err => console.error('Error:', err));
+        }
+
+        function resetForm() {
+            document.getElementById('slot-form').reset();
+            document.getElementById('edit-stream-id').value = "";
+            document.getElementById('slot-logical-id').value = "";
+            document.getElementById('form-title').textContent = "Add New Slot";
+            document.getElementById('save-btn-text').textContent = "Save Time Slot";
+            document.querySelectorAll('input[name="days"]').forEach(cb => cb.checked = false);
+
+            // Default Times
+            document.getElementById('start-time').value = "00:00:00";
+            document.getElementById('end-time').value = "23:59:59";
+
+            document.querySelector('input[name="powerMode"][value="charge"]').checked = true;
+            updatePowerInputs();
+        }
+
+        function saveAddSlotDraft() {
+            const form = document.getElementById('slot-form');
+            const data = new FormData(form);
+            addSlotDraftState = {
+                days: Array.from(document.querySelectorAll('input[name="days"]:checked')).map(cb => cb.value),
+                startTime: document.getElementById('start-time').value,
+                endTime: document.getElementById('end-time').value,
+                powerMode: document.querySelector('input[name="powerMode"]:checked').value,
+                targetPower: document.getElementById('target-power').value,
+                minPowerGoal: document.getElementById('min-power-goal').value,
+                maxPowerGoal: document.getElementById('max-power-goal').value,
+                exportMinSocConstraint: document.getElementById('export-min-soc-constraint').value,
+                importMaxSocConstraint: document.getElementById('import-max-soc-constraint').value
+            };
+        }
+
+        function restoreAddSlotDraft() {
+            if (!addSlotDraftState) return;
+            const s = addSlotDraftState;
+
+            // Days
+            document.querySelectorAll('input[name="days"]').forEach(cb => {
+                cb.checked = s.days.includes(cb.value);
+            });
+            // Times
+            document.getElementById('start-time').value = s.startTime;
+            document.getElementById('end-time').value = s.endTime;
+            // Mode
+            if (s.powerMode) {
+                document.querySelector(`input[name="powerMode"][value="${s.powerMode}"]`).checked = true;
+            }
+            // Values
+            document.getElementById('target-power').value = s.targetPower;
+            document.getElementById('min-power-goal').value = s.minPowerGoal;
+            document.getElementById('max-power-goal').value = s.maxPowerGoal;
+            document.getElementById('export-min-soc-constraint').value = s.exportMinSocConstraint;
+            document.getElementById('import-max-soc-constraint').value = s.importMaxSocConstraint;
+
+            updatePowerInputs();
+        }
+
+        function selectAllDays() {
+            const checkboxes = document.querySelectorAll('input[name="days"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+        }
+
+        function renderSlots() {
+            const container = document.getElementById('slots-container');
+            document.getElementById('slot-count').textContent = timeSlots.length;
+
+            if (timeSlots.length === 0) {
+                container.innerHTML = '<div class="no-data" style="text-align: center; padding: 3rem; color: var(--text-secondary);">No time slots configured.</div>';
+                return;
+            }
+
+            container.innerHTML = `<div class="slots-grid">${timeSlots.map((slot, index) => {
+                const data = slot.timeslot || slot;
+                const state = data.desiredState || data;
+
+                // Display all power and SOC values
+                const minPowerGoal = state.minPowerGoal !== undefined ? state.minPowerGoal : 0;
+                const maxPowerGoal = state.maxPowerGoal !== undefined ? state.maxPowerGoal : 0;
+                const exportMinSoc = state.exportMinSocConstraint !== undefined ? state.exportMinSocConstraint : 20;
+                const importMaxSoc = state.importMaxSocConstraint !== undefined ? state.importMaxSocConstraint : 100;
+
+                let start = data.startTime || data.start || "--:--:--";
+                let end = data.endTime || data.end || "--:--:--";
+                // Strip seconds for display
+                //if (start.length > 5) start = start.substring(0, 5);
+                //if (end.length > 5) end = end.substring(0, 5);
+
+                // Day badges mapping
+                const dayMap = { "Monday": "Mon", "Tuesday": "Tue", "Wednesday": "Wed", "Thursday": "Thu", "Friday": "Fri", "Saturday": "Sat", "Sunday": "Sun" };
+                const daysDisplay = (data.days && data.days.length > 0) ? data.days.map(d => dayMap[d] || d) : [];
+                const dayStr = (daysDisplay.length > 0) ? daysDisplay.join(', ') : 'All Days';
+
+                // Extract and format stream ID timestamp
+                let streamIdDisplay = '';
+                if (slot.stream_id) {
+                    // Stream ID format: "1766055169667-0" where the first part is timestamp in ms
+                    const timestampMs = parseInt(slot.stream_id.split('-')[0]);
+                    if (!isNaN(timestampMs)) {
+                        const date = new Date(timestampMs);
+                        streamIdDisplay = date.toLocaleString();
+                    }
+                }
+
+                // Mode Logic
+                let mode = 'Range';
+                let badgeStyle = 'background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2);'; // Default Grey
+
+                if (minPowerGoal === 0 && maxPowerGoal === 0) {
+                    mode = 'Balance';
+                    // Blue
+                    badgeStyle = 'background: rgba(6, 182, 212, 0.1); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.2);';
+                }
+                else if (minPowerGoal === maxPowerGoal && minPowerGoal > 0) {
+                    mode = 'Charge';
+                    // Green
+                    badgeStyle = 'background: rgba(34, 197, 94, 0.1); color: var(--accent-green); border: 1px solid rgba(34, 197, 94, 0.2);';
+                }
+                else if (minPowerGoal === maxPowerGoal && minPowerGoal < 0) {
+                    mode = 'Discharge';
+                    // Red
+                    badgeStyle = 'background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);';
+                }
+                else {
+                    mode = 'Range';
+                    // Grey
+                    badgeStyle = 'background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2);';
+                }
+
+                return `
+                <div class="card" style="padding: 1rem; border-left: 4px solid var(--accent-cyan);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.8rem;">
+                        <div style="font-weight: 600; font-size: 1.1rem; white-space: nowrap;">${start} - ${end}</div>
+                        <div style="display: flex; align-items: center; gap: 0.8rem;">
+                            <span class="status-indicator" style="${badgeStyle} font-size: 0.75rem; margin: 0;">${mode}</span>
+                            <div style="display: flex; gap: 1.1rem; margin-left: 0.2rem;">
+                                <button onclick="editSlot(${index})" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); font-size: 0.9rem; padding: 2px;">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="deleteSlot(${index})" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); font-size: 0.9rem; padding: 2px;">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span>${dayStr}</span>
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); opacity: 0.7;">${streamIdDisplay}</span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.9rem;">
+                        <div class="data-group" style="padding: 0.5rem; margin-bottom: 0;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">Power Goal</div>
+                            <div style="font-family: monospace; font-weight: 600;">${minPowerGoal} W / ${maxPowerGoal} W</div>
+                        </div>
+                        <div class="data-group" style="padding: 0.5rem; margin-bottom: 0;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">SOC Limit</div>
+                            <div style="font-family: monospace; font-weight: 600;">${exportMinSoc}% to ${importMaxSoc}%</div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+
+    </script>
+    <script>
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    </script>
+
+
+
+    <script src="/static/js/main.js?v={{ APP_VERSION }}"></script>
+    <script src="/static/js/theme.js?v={{ APP_VERSION }}"></script>
+</body>
+
+</html>

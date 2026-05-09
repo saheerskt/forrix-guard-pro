@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telemetry Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ APP_VERSION }}">
+</head>
+
+<body class="theme-dark">
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    <div class="container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="dashboard-title">
+                <div class="title-group">
+                    <h1>Telemetry Dashboard</h1>
+                    <div class="device-id">
+                        <i class="fa-solid fa-server"></i>
+                        <span id="currentDevice">FORRIXGUARD000203</span>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="nav-bar">
+                <a href="/multi" class="nav-btn active">
+                    <i class="fa-solid fa-grip"></i> Dashboard
+                </a>
+                <a href="/phase-power-comparison" class="nav-btn">
+                    <i class="fa-solid fa-chart-line"></i> Power Plots
+                </a>
+                <a href="/power-time-settings" class="nav-btn">
+                    <i class="fa-regular fa-clock"></i> Power Settings
+                </a>
+                <a href="/monthly-report" class="nav-btn">
+                    <i class="fa-solid fa-file-invoice"></i> Monthly Report
+                </a>
+                <a href="/forrixguard-setup" class="nav-btn">
+                    <i class="fa-solid fa-sliders"></i> ForrixGuard Setup
+                </a>
+                <div class="user-profile-badge">
+                    <i class="fa-solid fa-user-circle" id="user-role-icon" style="color: var(--accent-cyan);"></i>
+                    <span id="user-display-name" style="font-size: 0.85rem; font-weight: 500; color: var(--text-primary);">...</span>
+                </div>
+                <button id="logout-btn" class="nav-btn"
+                    style="color: var(--accent-red); border-color: rgba(220, 38, 38, 0.3); background: rgba(220, 38, 38, 0.1);">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </nav>
+        </header>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <span id="connection-status" class="status-indicator status-offline">System Offline</span>
+                </div>
+                <div class="status-item">
+                    <i class="fa-regular fa-clock"></i>
+                    <span class="status-label">Last Update:</span>
+                    <span class="status-value" id="lastUpdate">--</span>
+                </div>
+            </div>
+            <div class="status-center">
+                <button id="toggle-details-btn" class="nav-btn" style="padding: 0.5rem 1rem;">
+                    <i class="fa-solid fa-eye" id="toggle-details-icon"></i> <span id="toggle-details-text">Show
+                        Detail</span>
+                </button>
+            </div>
+            <div class="status-right">
+            </div>
+        </div>
+
+        <div class="card demand-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-bolt card-icon icon-demand"></i>
+                    <span>Maximum Demand</span>
+                </div>
+                <span id="forrixguard-demand-risk" class="status-indicator status-normal">NORMAL</span>
+            </div>
+            <!-- Window progress bar -->
+            <div class="demand-window-bar-wrap">
+                <div class="demand-window-bar-track">
+                    <div id="demand-window-bar-fill" class="demand-window-bar-fill"></div>
+                </div>
+                <div class="demand-window-labels">
+                    <span class="label">Window elapsed</span>
+                    <span class="label" id="demand-window-pct">--%</span>
+                </div>
+            </div>
+            <div class="data-group demand-metrics">
+                <div class="data-row demand-metric">
+                    <span class="label">Current</span>
+                    <span class="value val-power">
+                        <span id="forrixguard-current-demand" class="skeleton">--</span><span class="unit">kW</span>
+                    </span>
+                </div>
+                <div class="data-row demand-metric">
+                    <span class="label">Projected</span>
+                    <span class="value val-power">
+                        <span id="forrixguard-projected-demand" class="skeleton">--</span><span class="unit">kW</span>
+                    </span>
+                </div>
+                <div class="data-row demand-metric">
+                    <span class="label">Allowed</span>
+                    <span class="value">
+                        <span id="forrixguard-allowed-demand" class="skeleton">--</span><span class="unit">kW</span>
+                    </span>
+                </div>
+                <div class="data-row demand-metric">
+                    <span class="label">Margin</span>
+                    <span class="value">
+                        <span id="forrixguard-demand-margin" class="skeleton">--</span><span class="unit">kW</span>
+                    </span>
+                </div>
+                <div class="data-row demand-metric">
+                    <span class="label">Correction</span>
+                    <span class="value val-power">
+                        <span id="forrixguard-correction-demand" class="skeleton">--</span><span class="unit">kW</span>
+                    </span>
+                </div>
+                <div class="data-row demand-metric">
+                    <span class="label">Opportunity</span>
+                    <span class="value val-power">
+                        <span id="forrixguard-savings-opportunity" class="skeleton">--</span><span class="unit">kW</span>
+                    </span>
+                </div>
+                <div class="data-row demand-metric">
+                    <span class="label">Time Left</span>
+                    <span class="value">
+                        <span id="forrixguard-demand-time-left" class="skeleton">--</span><span class="unit">min:sec</span>
+                    </span>
+                </div>
+            </div>
+            <div class="demand-intelligence">
+                <div>
+                    <span class="label">Cause</span>
+                    <strong id="forrixguard-event-cause">--</strong>
+                </div>
+                <div>
+                    <span class="label">Telemetry</span>
+                    <strong id="forrixguard-telemetry-freshness">--</strong>
+                </div>
+                <div class="demand-recommendation">
+                    <span class="label">Recommendation</span>
+                    <strong id="forrixguard-recommendation">--</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="card tariff-impact-card" id="tariff-impact-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-indian-rupee-sign card-icon tariff-icon"></i>
+                    <span>Tariff Impact</span>
+                </div>
+                <span id="tariff-currency-badge" class="tariff-currency-badge">INR</span>
+            </div>
+            <div class="data-group">
+                <div class="data-row">
+                    <span class="label">Demand Charge Rate</span>
+                    <span class="value"><span id="tariff-demand-rate" class="skeleton">--</span><span class="unit">/kVA·mo</span></span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Projected MTD Charge</span>
+                    <span class="value tariff-risk"><span id="tariff-projected-charge" class="skeleton">--</span></span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Breach Cost if Hit</span>
+                    <span class="value tariff-risk"><span id="tariff-breach-cost" class="skeleton">--</span></span>
+                </div>
+                <div class="tariff-divider"></div>
+                <div class="data-row">
+                    <span class="label">BESS Savings Today</span>
+                    <span class="value tariff-saving"><span id="tariff-savings-today" class="skeleton">--</span></span>
+                </div>
+            </div>
+            <div class="tariff-note" id="tariff-note">Configure day/night rates in Setup to enable ROI tracking.</div>
+        </div>
+
+        <div class="card telemetry-map-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-diagram-project card-icon icon-grid"></i>
+                    <span>Site Telemetry</span>
+                </div>
+                <span class="status-indicator status-normal">Mapped</span>
+            </div>
+            <div class="telemetry-map-grid">
+                <div>
+                    <span class="label">Grid Import</span>
+                    <strong><span id="fg-grid-import">--</span><span class="unit">kW</span></strong>
+                    <small id="fg-grid-map">--</small>
+                </div>
+                <div>
+                    <span class="label">Solar</span>
+                    <strong><span id="fg-solar">--</span><span class="unit">kW</span></strong>
+                    <small id="fg-solar-map">--</small>
+                </div>
+                <div>
+                    <span class="label">Load</span>
+                    <strong><span id="fg-load">--</span><span class="unit">kW</span></strong>
+                    <small id="fg-load-map">--</small>
+                </div>
+                <div>
+                    <span class="label">BESS</span>
+                    <strong><span id="fg-bess">--</span><span class="unit">kW</span></strong>
+                    <small id="fg-bess-map">--</small>
+                </div>
+                <div>
+                    <span class="label">DG Status</span>
+                    <strong id="fg-dg-status">--</strong>
+                    <small id="fg-dg-map">--</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="card event-proof-card proof-timeline-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-clipboard-check card-icon icon-demand"></i>
+                    <span>Proof Timeline</span>
+                </div>
+                <span id="forrixguard-event-count" class="status-indicator status-normal">0</span>
+            </div>
+            <div id="forrixguard-event-list" class="event-proof-list">
+                <div class="event-proof-empty">No events recorded</div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="dashboard-grid {{ grid_modifier }}">
+            {% for meter in meters %}
+            <div class="card meter-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-tachometer-alt card-icon icon-grid"></i>
+                        <span>
+                            {%- set m_idx = meter.device_index if meter.device_index is defined else loop.index0 -%}
+                            {%- if m_idx == 0 -%}Grid Meter
+                            {%- elif m_idx == 1 -%}PV Meter
+                            {%- elif m_idx == 2 -%}Load Meter
+                            {%- else -%}Meter {{ m_idx }}{%- endif -%}
+                        </span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                        <span id="m{{ m_idx }}-last-seen" class="device-staleness-badge"></span>
+                        <span class="label">{{ meter.model|default('Unknown') }}</span>
+                    </div>
+                </div>
+
+                <!-- Total Power Gauge -->
+                <div class="data-group" style="margin-bottom: 1rem; text-align: center; padding: 1rem;">
+                    <div class="group-title">Total Active Power</div>
+                    <div class="gauge-outer">
+                        <svg viewBox="0 0 100 60" class="gauge-svg-full">
+                            <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" class="gauge-bg"
+                                stroke="var(--gauge-track)" stroke-width="12" stroke-linecap="round" />
+                            <path id="gauge-path-m{{ m_idx }}" d="M 10 50 A 40 40 0 0 1 90 50" fill="none"
+                                class="gauge-arc-green" stroke-width="12" stroke-linecap="round"
+                                stroke-dasharray="0 200" />
+                        </svg>
+                        <div class="gauge-value-wrap">
+                            <span id="m{{ m_idx }}-total-power" class="gauge-value-text skeleton">--</span>
+                            <span class="gauge-value-unit">Watts</span>
+                        </div>
+                        <div class="gauge-min-label">0</div>
+                        <div class="gauge-max-label"><span id="m{{ m_idx }}-gauge-max">--</span></div>
+                    </div>
+                </div>
+
+                <!-- Power Factor — always visible -->
+                <div class="data-group-compact">
+                    <div class="data-row">
+                        <span class="label">Power Factor</span>
+                        <span class="value"><span id="m{{ m_idx }}-power-factor">--</span></span>
+                    </div>
+                </div>
+
+                <!-- Phase A -->
+                <div class="data-group detailed-view-only">
+                    <div class="group-title">Phase A</div>
+                    <div class="data-row">
+                        <span class="label">Active Power</span>
+                        <span class="value val-power">
+                            <span id="m{{ m_idx }}-phA-power">--</span><span class="unit">W</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Reactive Power</span>
+                        <span class="value val-power">
+                            <span id="m{{ m_idx }}-phA-reactive">--</span><span class="unit">VAR</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Voltage</span>
+                        <span class="value val-voltage">
+                            <span id="m{{ m_idx }}-phA-voltage">--</span><span class="unit">V</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Current</span>
+                        <span class="value val-current">
+                            <span id="m{{ m_idx }}-phA-current">--</span><span class="unit">A</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Frequency</span>
+                        <span class="value val-frequency">
+                            <span id="m{{ m_idx }}-phA-frequency">--</span><span class="unit">Hz</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Phase B -->
+                <div class="data-group detailed-view-only">
+                    <div class="group-title">Phase B</div>
+                    <div class="data-row">
+                        <span class="label">Active Power</span>
+                        <span class="value val-power">
+                            <span id="m{{ m_idx }}-phB-power">--</span><span class="unit">W</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Reactive Power</span>
+                        <span class="value val-power">
+                            <span id="m{{ m_idx }}-phB-reactive">--</span><span class="unit">VAR</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Voltage</span>
+                        <span class="value val-voltage">
+                            <span id="m{{ m_idx }}-phB-voltage">--</span><span class="unit">V</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Current</span>
+                        <span class="value val-current">
+                            <span id="m{{ m_idx }}-phB-current">--</span><span class="unit">A</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Frequency</span>
+                        <span class="value val-frequency">
+                            <span id="m{{ m_idx }}-phB-frequency">--</span><span class="unit">Hz</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Phase C -->
+                <div class="data-group detailed-view-only">
+                    <div class="group-title">Phase C</div>
+                    <div class="data-row">
+                        <span class="label">Active Power</span>
+                        <span class="value val-power">
+                            <span id="m{{ m_idx }}-phC-power">--</span><span class="unit">W</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Reactive Power</span>
+                        <span class="value val-power">
+                            <span id="m{{ m_idx }}-phC-reactive">--</span><span class="unit">VAR</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Voltage</span>
+                        <span class="value val-voltage">
+                            <span id="m{{ m_idx }}-phC-voltage">--</span><span class="unit">V</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Current</span>
+                        <span class="value val-current">
+                            <span id="m{{ m_idx }}-phC-current">--</span><span class="unit">A</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Frequency</span>
+                        <span class="value val-frequency">
+                            <span id="m{{ m_idx }}-phC-frequency">--</span><span class="unit">Hz</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% for pair in pairs %}
+            <div class="card inverter-card" style="display: block !important;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-server card-icon icon-solar"></i>
+                        <span>ESS {{ loop.index0 }}</span>
+                    </div>
+                    <div style="margin-left: auto; display: flex; align-items: center; gap: 0.4rem;">
+                        <span id="inv{{ loop.index0 }}-last-seen" class="device-staleness-badge"></span>
+                        <span id="inv{{ loop.index0 }}-fault-code" class="status-indicator status-fault"
+                              style="display:none;font-family:'JetBrains Mono',monospace;font-size:0.72rem;"></span>
+                        <span class="label">{{ pair.inverter.model|default('Unknown') }}</span>
+                        <span id="inv{{ loop.index0 }}-status" class="status-indicator status-offline">OFFLINE</span>
+                    </div>
+                </div>
+
+                <!-- Total Power Gauge -->
+                <div class="data-group"
+                    style="margin-bottom: 1rem; text-align: center; padding: 1rem; position: relative;">
+                    <div class="group-title">Total Active Power</div>
+                    <div class="gauge-outer">
+                        <svg viewBox="0 0 100 60" class="gauge-svg-full">
+                            <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" class="gauge-bg"
+                                stroke="var(--gauge-track)" stroke-width="12" stroke-linecap="round" />
+                            <path id="gauge-path-inv{{ loop.index0 }}" d="M 10 50 A 40 40 0 0 1 90 50" fill="none"
+                                class="gauge-arc-green" stroke-width="12" stroke-linecap="round"
+                                stroke-dasharray="0 200" />
+                        </svg>
+                        <div class="gauge-value-wrap">
+                            <span id="inv{{ loop.index0 }}-total-power" class="gauge-value-text skeleton">--</span>
+                            <span class="gauge-value-unit">Watts</span>
+                        </div>
+                        <div class="gauge-min-label">0</div>
+                        <div class="gauge-max-label"><span id="inv{{ loop.index0 }}-gauge-max">--</span></div>
+                    </div>
+                    <!-- Simple View SOC Badge -->
+                    <div class="simple-soc-badge"
+                        style="position: absolute; bottom: 10px; right: 10px; display: flex; align-items: center; gap: 4px;">
+                        <div
+                            style="position: relative; border: 2px solid var(--accent-green); border-radius: 4px; padding: 2px 6px; font-weight: bold; color: var(--accent-green); font-size: 0.85rem; background: var(--bg-card); display: flex; align-items: center; justify-content: center; min-width: 45px; z-index: 10;">
+                            <span id="inv{{ loop.index0 }}-simple-soc">--</span><span style="font-size: 0.7em;">%</span>
+                            <div
+                                style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 4px; height: 10px; background: var(--accent-green); border-radius: 0 2px 2px 0;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase A -->
+                <div class="data-group detailed-view-only" style="display: block; width: 100%; margin-bottom: 1rem;">
+                    <div class="group-title">Phase A</div>
+                    <div class="data-row">
+                        <span class="label">Active Power</span>
+                        <span class="value val-power">
+                            <span id="inv{{ loop.index0 }}-phA-power">--</span><span class="unit">W</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Reactive Power</span>
+                        <span class="value val-power">
+                            <span id="inv{{ loop.index0 }}-phA-reactive">--</span><span class="unit">VAR</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Voltage</span>
+                        <span class="value val-voltage">
+                            <span id="inv{{ loop.index0 }}-phA-voltage">--</span><span class="unit">V</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Phase B -->
+                <div class="data-group detailed-view-only" style="display: block; width: 100%; margin-bottom: 1rem;">
+                    <div class="group-title">Phase B</div>
+                    <div class="data-row">
+                        <span class="label">Active Power</span>
+                        <span class="value val-power">
+                            <span id="inv{{ loop.index0 }}-phB-power">--</span><span class="unit">W</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Reactive Power</span>
+                        <span class="value val-power">
+                            <span id="inv{{ loop.index0 }}-phB-reactive">--</span><span class="unit">VAR</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Voltage</span>
+                        <span class="value val-voltage">
+                            <span id="inv{{ loop.index0 }}-phB-voltage">--</span><span class="unit">V</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Phase C -->
+                <div class="data-group detailed-view-only" style="display: block; width: 100%; margin-bottom: 1rem;">
+                    <div class="group-title">Phase C</div>
+                    <div class="data-row">
+                        <span class="label">Active Power</span>
+                        <span class="value val-power">
+                            <span id="inv{{ loop.index0 }}-phC-power">--</span><span class="unit">W</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Reactive Power</span>
+                        <span class="value val-power">
+                            <span id="inv{{ loop.index0 }}-phC-reactive">--</span><span class="unit">VAR</span>
+                        </span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Voltage</span>
+                        <span class="value val-voltage">
+                            <span id="inv{{ loop.index0 }}-phC-voltage">--</span><span class="unit">V</span>
+                        </span>
+                    </div>
+                </div>
+
+
+
+                <!-- Battery Section -->
+                <div class="battery-widget-wrapper detailed-view-only">
+                    <div class="data-group battery-highlight">
+                        <div class="group-title">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fa-solid fa-battery-three-quarters"></i>
+                                <span>Battery: {{ pair.battery.model|default('Unknown') }}</span>
+                            </div>
+                            <button class="battery-toggle-btn"
+                                onclick="toggleBatteryDetails(this, 'battery{{ loop.index0 }}-details')">
+                                <i class="fa-solid fa-chevron-up"></i>
+                            </button>
+                        </div>
+                        <div class="data-row">
+                            <span class="label">SOC</span>
+                            <span class="value">
+                                <span id="battery{{ loop.index0 }}-soc">--</span><span class="unit">%</span>
+                            </span>
+                        </div>
+                        <div class="data-row">
+                            <span class="label">Voltage</span>
+                            <span class="value val-voltage">
+                                <span id="battery{{ loop.index0 }}-voltage">--</span><span class="unit">V</span>
+                            </span>
+                        </div>
+                        <div class="data-row">
+                            <span class="label">Temperature</span>
+                            <span class="value val-temp">
+                                <span id="battery{{ loop.index0 }}-temp">--</span><span class="unit">°C</span>
+                            </span>
+                        </div>
+
+                        <!-- Hidden Overlay Drawer -->
+                        <div class="battery-extra-details" id="battery{{ loop.index0 }}-details">
+                            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.5rem 0;">
+                            <div class="data-row">
+                                <span class="label">Max Cell Voltage</span>
+                                <span class="value val-voltage">
+                                    <span id="battery{{ loop.index0 }}-max-voltage">--</span><span class="unit">V</span>
+                                </span>
+                            </div>
+                            <div class="data-row">
+                                <span class="label">Min Cell Voltage</span>
+                                <span class="value val-voltage">
+                                    <span id="battery{{ loop.index0 }}-min-voltage">--</span><span class="unit">V</span>
+                                </span>
+                            </div>
+                            <div class="data-row">
+                                <span class="label">Max Cell Temperature</span>
+                                <span class="value val-temp">
+                                    <span id="battery{{ loop.index0 }}-max-temp">--</span><span class="unit">°C</span>
+                                </span>
+                            </div>
+                            <div class="data-row">
+                                <span class="label">Min Cell Temperature</span>
+                                <span class="value val-temp">
+                                    <span id="battery{{ loop.index0 }}-min-temp">--</span><span class="unit">°C</span>
+                                </span>
+                            </div>
+
+                            <!-- MPPT Section -->
+                            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.5rem 0;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0;">
+                                <i class="fa-solid fa-solar-panel" style="color: var(--accent-amber);"></i>
+                                <span style="font-weight: 600; color: var(--text-primary);">MPPT</span>
+                            </div>
+                            {% if pair.mppt_index is not none %}
+                            <div class="data-row">
+                                <span class="label">Output Voltage</span>
+                                <span class="value val-voltage">
+                                    <span id="mppt{{ pair.mppt_index }}-output-voltage">--</span><span
+                                        class="unit">V</span>
+                                </span>
+                            </div>
+                            <div class="data-row">
+                                <span class="label">Total Power</span>
+                                <span class="value val-power">
+                                    <span id="mppt{{ pair.mppt_index }}-total-power">--</span><span
+                                        class="unit">W</span>
+                                </span>
+                            </div>
+                            <div class="data-row">
+                                <span class="label">Temperature</span>
+                                <span class="value val-temp">
+                                    <span id="mppt{{ pair.mppt_index }}-temperature">--</span><span
+                                        class="unit">°C</span>
+                                </span>
+                            </div>
+                            <div class="data-row">
+                                <span class="label">Status</span>
+                                <span class="value">
+                                    <span id="mppt{{ pair.mppt_index }}-status" class="status-indicator">--</span>
+                                </span>
+                            </div>
+                            {% else %}
+                            <div style="color: var(--text-secondary); font-size: 0.9rem; padding: 0.5rem;">No MPPT
+                                linked</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% for dg in dgs %}
+            {% set dg_idx = loop.index0 %}
+            <div class="card dg-card">
+                <div class="card-header">
+                    <div class="card-title-row">
+                        <i class="fas fa-cog dg-icon"></i>
+                        <span class="card-title">{{ dg.get('displayName', 'DG ' ~ (dg_idx + 1)) }}</span>
+                        <span id="dg{{ dg_idx }}-last-seen" class="device-staleness-badge"></span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="data-grid">
+                        <div class="data-group">
+                            <div class="group-title">Status</div>
+                            <div class="data-row">
+                                <span class="label">State</span>
+                                <span class="value skeleton" id="dg{{ dg_idx }}-status">--</span>
+                            </div>
+                        </div>
+                        <div class="data-group">
+                            <div class="group-title">Output</div>
+                            <div class="data-row">
+                                <span class="label">Power</span>
+                                <span class="value skeleton" id="dg{{ dg_idx }}-power-kw">--</span>
+                                <span class="unit">kW</span>
+                            </div>
+                        </div>
+                        <div class="data-group">
+                            <div class="group-title">Runtime</div>
+                            <div class="data-row">
+                                <span class="label">Run Time</span>
+                                <span class="value skeleton" id="dg{{ dg_idx }}-runtime-min">--</span>
+                                <span class="unit">min</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Site footer -->
+    <footer class="site-footer" aria-label="Site footer">
+        <div class="footer-inner"
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; text-align: center;">
+            <span>Copyright © Forrix Ltd 2026. All rights reserved. Registered in England & Wales. Company
+                registration No.11571089. VAT registration number is 321482331.</span>
+            <span style="color: var(--text-secondary); font-size: 0.85rem;" title="forrixguard-monitor version">v{{
+                MONITOR_VERSION }}</span>
+        </div>
+    </footer>
+
+    <script>
+        // Expose device counts and MPPT mapping for JavaScript
+        window.numMeters = {{ num_meters | default (0) | tojson }};
+        window.numPairs = {{ num_pairs | default (0) | tojson }};
+        window.numMppts = {{ num_mppts | default (0) | tojson }};
+        window.numDgs = {{ dgs | default ([]) | length | tojson }};
+        // Map pair index to MPPT index (or null if no MPPT linked to that pair)
+        window.pairMpptMapping = {{ pair_mppt_mapping | default ([]) | tojson }};
+    </script>
+    <script src="/static/js/main.js?v={{ APP_VERSION }}"></script>
+    <script>
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    </script>
+    <script src="/static/js/theme.js?v={{ APP_VERSION }}"></script>
+    <div id="toast-container"></div>
+</body>
+
+</html>

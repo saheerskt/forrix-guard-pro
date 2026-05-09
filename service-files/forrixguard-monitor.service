@@ -1,0 +1,15 @@
+[Unit]
+Description=ForrixGuard Monitor Dashboard support
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /etc/forrixguard-monitor/dashboard.py
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
