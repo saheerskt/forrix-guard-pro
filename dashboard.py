@@ -1230,6 +1230,12 @@ def process_forrixguard_demand_message(fields):
     latest_data["fg_forecast_breach_risk"]    = forecast_breach
     latest_data["fg_forecast_confidence"]     = forecast_conf
 
+    # BESS dispatch recommendation (P3/P4)
+    rec = _compute_bess_recommendation(latest_data)
+    latest_data["fg_recommendation"] = rec
+    if rec.get('auto_apply') and rec.get('action') == 'discharge_bess':
+        asyncio.get_event_loop().create_task(_auto_apply_recommendation(rec))
+
     if "data_status" not in latest_data:
         latest_data["data_status"] = {}
 
@@ -1253,6 +1259,9 @@ def process_forrixguard_demand_message(fields):
         "fg_projected_demand_charge",
         "fg_breach_cost_if_hit",
         "fg_savings_today",
+        "fg_next_window_forecast_kw",
+        "fg_forecast_breach_risk",
+        "fg_forecast_confidence",
     ]:
         latest_data["data_status"][key] = True
 
@@ -2631,6 +2640,169 @@ async def save_tariff_api(request):
     return web.json_response({'success': True, 'tariff': config['site']['tariff']})
 
 
+def _compute_bess_recommendation(data: dict) -> dict:
+    """Compute a BESS dispatch recommendation from latest demand and battery state.
+    Returns a recommendation dict (empty if no action recommended)."""
+    config = load_forrixguard_config() or {}
+    control = config.get('control') or {}
+    mode = control.get('mode', 'MONITOR_ONLY')
+    allow_bess = control.get('allowBessDispatch', False)
+    soc_reserve = float(control.get('socReservePct', 35))
+
+    if not allow_bess and mode == 'MONITOR_ONLY':
+        return {}
+
+    breach_risk     = data.get('forrixguard_breach_risk', False)
+    correction_kw   = float(data.get('forrixguard_required_correction_kw') or 0)
+    time_left_sec   = int(data.get('forrixguard_time_left_seconds') or 0)
+    allowed_kw      = float(data.get('forrixguard_allowed_kw') or 0)
+    projected_kw    = float(data.get('forrixguard_projected_demand_kw') or 0)
+
+    if not breach_risk or correction_kw <= 0:
+        return {}
+
+    bess_soc = float(data.get('battery0_soc') or data.get('bat0_soc') or 0)
+    if bess_soc <= soc_reserve:
+        return {'action': 'bess_unavailable', 'reason': f'BESS SOC {bess_soc:.0f}% at or below reserve {soc_reserve:.0f}%'}
+
+    tariff = (config.get('site') or {}).get('tariff') or {}
+    demand_charge = float(tariff.get('demandChargePerKva', 0) or 0)
+    breach_cost   = round(correction_kw * demand_charge, 0) if demand_charge > 0 else None
+    bess_kwh_used = round(correction_kw * (time_left_sec / 3600), 3)
+    day_rate      = float(tariff.get('dayRatePerKwh', 0) or 0)
+    batt_value    = round(bess_kwh_used * day_rate, 2) if day_rate > 0 else None
+    currency      = tariff.get('currency', 'INR')
+
+    return {
+        'action':         'discharge_bess',
+        'correction_kw':  round(correction_kw, 1),
+        'time_left_sec':  time_left_sec,
+        'bess_soc':       bess_soc,
+        'bess_kwh_used':  bess_kwh_used,
+        'breach_cost':    breach_cost,
+        'batt_value':     batt_value,
+        'currency':       currency,
+        'control_mode':   mode,
+        'auto_apply':     mode == 'CLOSED_LOOP_CONTROL',
+    }
+
+
+_last_auto_apply_ts: float = 0.0
+
+async def _auto_apply_recommendation(rec: dict):
+    """P4: Auto-apply BESS dispatch in CLOSED_LOOP_CONTROL mode. Rate-limited to once per window."""
+    global redis_client, _last_auto_apply_ts
+    now = time.time()
+    if now - _last_auto_apply_ts < 840:  # at most once per 14 min
+        return
+    _last_auto_apply_ts = now
+
+    correction_kw = rec.get('correction_kw', 0)
+    time_left_sec = rec.get('time_left_sec', 300)
+    if correction_kw <= 0 or not redis_client:
+        return
+
+    from datetime import datetime, timedelta
+    import json as _json
+    now_dt   = datetime.now()
+    end_dt   = now_dt + timedelta(seconds=time_left_sec)
+    today    = now_dt.strftime('%Y-%m-%d')
+    dow_map  = {0:'Monday',1:'Tuesday',2:'Wednesday',3:'Thursday',4:'Friday',5:'Saturday',6:'Sunday'}
+    power_w  = int(correction_kw * 1000)
+    timeslot = {
+        'timeslot': {
+            'startDate': today, 'endDate': today,
+            'startTime': now_dt.strftime('%H:%M:%S'), 'endTime': end_dt.strftime('%H:%M:%S'),
+            'days': [dow_map[now_dt.weekday()]],
+            'desiredState': {
+                'minPowerGoal': -power_w, 'maxPowerGoal': -power_w,
+                'minPowerConstraint': -20000, 'maxPowerConstraint': 20000,
+                'minPowerLimit': -20000, 'maxPowerLimit': 20000,
+                'exportMinSocConstraint': 20, 'importMaxSocConstraint': 98,
+            }
+        }
+    }
+    try:
+        await redis_client.xadd('timeslots_stream', {'timeslot_json': _json.dumps(timeslot)})
+        logger.info(f"[CLOSED_LOOP] Auto-applied BESS dispatch: {correction_kw} kW for {time_left_sec}s")
+        await broadcast({'type': 'auto_dispatch', 'correction_kw': correction_kw, 'duration_sec': time_left_sec})
+    except Exception as e:
+        logger.error(f"Auto-apply failed: {e}")
+
+
+async def apply_recommendation_api(request):
+    """Operator-approved: write a temporary BESS discharge timeslot to Redis."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    correction_kw  = float(body.get('correction_kw', 0))
+    time_left_sec  = int(body.get('time_left_sec', 900))
+    if correction_kw <= 0:
+        return web.json_response({'success': False, 'error': 'No correction kW specified'}, status=400)
+
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    end_time = now + timedelta(seconds=time_left_sec)
+    today_str = now.strftime('%Y-%m-%d')
+    start_hms = now.strftime('%H:%M:%S')
+    end_hms   = end_time.strftime('%H:%M:%S')
+    dow_map   = {0:'Monday',1:'Tuesday',2:'Wednesday',3:'Thursday',4:'Friday',5:'Saturday',6:'Sunday'}
+    day_name  = dow_map[now.weekday()]
+
+    power_w = int(correction_kw * 1000)
+    timeslot = {
+        'timeslot': {
+            'startDate': today_str, 'endDate': today_str,
+            'startTime': start_hms, 'endTime': end_hms,
+            'days': [day_name],
+            'desiredState': {
+                'minPowerGoal': -power_w, 'maxPowerGoal': -power_w,
+                'minPowerConstraint': -20000, 'maxPowerConstraint': 20000,
+                'minPowerLimit': -20000, 'maxPowerLimit': 20000,
+                'exportMinSocConstraint': 20, 'importMaxSocConstraint': 98,
+            }
+        }
+    }
+
+    global redis_client
+    if redis_client:
+        try:
+            import json as _json
+            await redis_client.xadd('timeslots_stream', {'timeslot_json': _json.dumps(timeslot)})
+            logger.info(f"BESS recommendation applied: {correction_kw} kW discharge for {time_left_sec}s")
+            return web.json_response({'success': True, 'applied_kw': correction_kw, 'duration_sec': time_left_sec})
+        except Exception as e:
+            return web.json_response({'success': False, 'error': str(e)}, status=500)
+    else:
+        return web.json_response({'success': False, 'error': 'Redis not connected'}, status=503)
+
+
+async def get_load_profile_api(request):
+    """Return the 96-slot (15-min) average load profile for a given day-of-week.
+    ?dow=0  → Monday … ?dow=6 → Sunday.  Omit to return all 7 days."""
+    dow_str = request.rel_url.query.get('dow')
+    if dow_str is not None:
+        try:
+            dow = int(dow_str)
+            if not 0 <= dow <= 6:
+                return web.json_response({'error': 'dow must be 0-6'}, status=400)
+            profile = LoadProfileStore.get_profile(dow)
+            counts  = [LoadProfileStore.get_count(dow, s) for s in range(96)]
+            return web.json_response({'dow': dow, 'profile_kw': profile, 'sample_counts': counts})
+        except ValueError:
+            return web.json_response({'error': 'invalid dow'}, status=400)
+    else:
+        all_profiles = {}
+        for d in range(7):
+            all_profiles[str(d)] = {
+                'profile_kw':    LoadProfileStore.get_profile(d),
+                'sample_counts': [LoadProfileStore.get_count(d, s) for s in range(96)],
+            }
+        return web.json_response({'profiles': all_profiles, 'total_slots': len(_lp_profile)})
+
+
 async def test_commissioning_api(request):
     config = load_forrixguard_config() or {}
     data = latest_data or {}
@@ -3400,6 +3572,7 @@ async def startup(app):
     
     # Start background connection maintainer without blocking
     asyncio.create_task(maintain_redis_connection())
+    asyncio.create_task(LoadProfileStore.load_from_redis())
 
 async def login_page(request):
     return web.Response(text=login_template.render(), content_type='text/html', headers=NO_CACHE_HEADERS)
@@ -3941,6 +4114,8 @@ if __name__ == '__main__':
     app.router.add_post('/api/commissioning/test', test_commissioning_api)
     app.router.add_get('/api/tariff', get_tariff_api)
     app.router.add_post('/api/tariff', save_tariff_api)
+    app.router.add_get('/api/load-profile', get_load_profile_api)
+    app.router.add_post('/api/apply-recommendation', apply_recommendation_api)
     app.router.add_get('/api/system-info', get_system_info_api)
     app.router.add_get('/api/wifi/status', get_wifi_status_api)
     app.router.add_get('/api/wifi/details', get_wifi_details_api)

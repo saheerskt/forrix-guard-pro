@@ -144,6 +144,13 @@
                     </span>
                 </div>
             </div>
+            <div class="data-row demand-metric demand-forecast-row" id="demand-forecast-row">
+                <span class="label">Next Window</span>
+                <span class="value">
+                    <span id="demand-forecast-kw" class="skeleton">--</span><span class="unit">kW</span>
+                    <span id="demand-forecast-badge" class="demand-forecast-badge" style="display:none"></span>
+                </span>
+            </div>
             <div class="demand-intelligence">
                 <div>
                     <span class="label">Cause</span>
@@ -157,6 +164,32 @@
                     <span class="label">Recommendation</span>
                     <strong id="forrixguard-recommendation">--</strong>
                 </div>
+            </div>
+        </div>
+
+        <div class="card recommendation-card" id="recommendation-card" style="display:none;">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-bolt card-icon recommendation-icon"></i>
+                    <span>MDGuard Recommendation</span>
+                </div>
+                <span id="rec-mode-badge" class="recommendation-mode-badge">ADVISORY</span>
+            </div>
+            <div class="recommendation-body">
+                <p id="rec-description" class="recommendation-description"></p>
+                <div class="recommendation-financials" id="rec-financials" style="display:none;">
+                    <span id="rec-breach-cost" class="tariff-risk"></span>
+                    <span class="recommendation-sep">·</span>
+                    <span id="rec-batt-value" class="tariff-saving"></span>
+                </div>
+            </div>
+            <div class="recommendation-actions">
+                <button class="nav-btn btn-primary" id="btn-apply-recommendation" onclick="applyRecommendation()">
+                    <i class="fa-solid fa-bolt"></i> Apply to Timeslots
+                </button>
+                <button class="nav-btn" onclick="dismissRecommendation()">
+                    <i class="fa-solid fa-xmark"></i> Dismiss
+                </button>
             </div>
         </div>
 

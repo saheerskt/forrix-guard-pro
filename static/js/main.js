@@ -134,6 +134,7 @@ function updateDashboard(data) {
 
     updateForrixGuardDemand(data);
     updateTariffImpact(data);
+    updateRecommendation(data);
     updateSiteTelemetry(data);
     updateForrixGuardEvents(data);
 
@@ -294,6 +295,27 @@ function updateForrixGuardDemand(data) {
         }
         const pctLabel = getEl('demand-window-pct');
         if (pctLabel) pctLabel.textContent = pct + '%';
+    }
+
+    // Next-window forecast
+    const forecastKw   = data.fg_next_window_forecast_kw;
+    const forecastRisk = data.fg_forecast_breach_risk;
+    const confidence   = data.fg_forecast_confidence || 0;
+    const forecastEl   = getEl('demand-forecast-kw');
+    const badgeEl      = getEl('demand-forecast-badge');
+    if (forecastEl && forecastKw > 0) {
+        forecastEl.textContent = forecastKw.toFixed(1);
+        forecastEl.classList.remove('skeleton');
+    }
+    if (badgeEl && forecastKw > 0) {
+        if (forecastRisk) {
+            badgeEl.textContent = 'BREACH RISK';
+            badgeEl.className = 'demand-forecast-badge breach';
+        } else {
+            badgeEl.textContent = confidence > 0 ? `${Math.round(confidence * 100)}% conf` : 'learning';
+            badgeEl.className = 'demand-forecast-badge safe';
+        }
+        badgeEl.style.display = '';
     }
 }
 
@@ -679,6 +701,79 @@ function updateTariffImpact(data) {
 
     const note = getEl('tariff-note');
     if (note) note.style.display = (loaded && rate > 0) ? 'none' : '';
+}
+
+let _currentRecommendation = null;
+let _recommendationDismissed = false;
+
+function updateRecommendation(data) {
+    const rec = data.fg_recommendation;
+    const card = getEl('recommendation-card');
+    if (!card) return;
+
+    if (!rec || !rec.action || rec.action === 'bess_unavailable' || _recommendationDismissed) {
+        card.style.display = 'none';
+        if (!rec || !rec.action) _recommendationDismissed = false;
+        return;
+    }
+
+    _currentRecommendation = rec;
+    card.style.display = '';
+
+    const modeBadge = getEl('rec-mode-badge');
+    if (modeBadge) {
+        const isClosedLoop = rec.control_mode === 'CLOSED_LOOP_CONTROL';
+        modeBadge.textContent = isClosedLoop ? 'AUTO-CONTROL' : 'ADVISORY';
+        modeBadge.className = 'recommendation-mode-badge' + (isClosedLoop ? ' closed-loop' : '');
+    }
+
+    const desc = getEl('rec-description');
+    if (desc) {
+        const mins = Math.ceil(rec.time_left_sec / 60);
+        desc.textContent = `Discharge ${rec.correction_kw} kW from BESS for next ${mins} min to prevent demand breach. BESS SOC: ${rec.bess_soc?.toFixed(0) ?? '--'}%`;
+    }
+
+    const fin = getEl('rec-financials');
+    const breachEl = getEl('rec-breach-cost');
+    const battEl = getEl('rec-batt-value');
+    const cur = rec.currency || 'INR';
+    if (fin && breachEl && battEl && (rec.breach_cost || rec.batt_value)) {
+        fin.style.display = '';
+        breachEl.textContent = rec.breach_cost ? `Breach avoided: ${cur} ${Number(rec.breach_cost).toLocaleString('en-IN')}` : '';
+        battEl.textContent  = rec.batt_value  ? `Battery cost: ${cur} ${Number(rec.batt_value).toLocaleString('en-IN')}` : '';
+    } else if (fin) {
+        fin.style.display = 'none';
+    }
+
+    const applyBtn = getEl('btn-apply-recommendation');
+    if (applyBtn) applyBtn.disabled = rec.auto_apply;
+}
+
+async function applyRecommendation() {
+    if (!_currentRecommendation) return;
+    try {
+        const r = await fetch('/api/apply-recommendation', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                correction_kw: _currentRecommendation.correction_kw,
+                time_left_sec: _currentRecommendation.time_left_sec,
+            })
+        });
+        const res = await r.json();
+        if (res.success) {
+            showToast(`Dispatching ${res.applied_kw} kW BESS for ${Math.ceil(res.duration_sec / 60)} min`, 'success');
+            dismissRecommendation();
+        } else {
+            showToast('Apply failed: ' + (res.error || ''), 'error');
+        }
+    } catch (e) { showToast('Error applying recommendation', 'error'); }
+}
+
+function dismissRecommendation() {
+    _recommendationDismissed = true;
+    const card = getEl('recommendation-card');
+    if (card) card.style.display = 'none';
 }
 
 async function loadTariffConfig() {
