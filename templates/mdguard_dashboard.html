@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MDGuard — ForrixGuard Maximum Demand Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/mdguard.css?v={{ APP_VERSION }}">
+</head>
+<body class="mg">
+  <!-- Top Nav -->
+  <header class="mg-nav">
+    <div class="mg-nav__brand">
+      <div class="logo">M</div>
+      <span class="product">MDGuard</span>
+      <span class="vendor">by ForrixGuard</span>
+    </div>
+
+    <nav class="mg-nav__links">
+      <a href="/mdguard" class="mg-nav__link active"><i class="fa-solid fa-gauge-high"></i> Live</a>
+      <a href="/monthly-report" class="mg-nav__link"><i class="fa-regular fa-file-lines"></i> Report</a>
+      <a href="/forrixguard-setup" class="mg-nav__link"><i class="fa-solid fa-sliders"></i> Setup</a>
+      <a href="/multi" class="mg-nav__link"><i class="fa-solid fa-grip"></i> Devices</a>
+    </nav>
+
+    <div class="mg-nav__center">
+      <span id="mgSiteName" class="mg-strong">—</span>
+      <span class="mg-dot" id="mgConnDot"></span>
+      <span id="mgConnText">Connecting…</span>
+    </div>
+
+    <div class="mg-nav__right">
+      <span>Updated</span>
+      <span class="ts" id="mgUpdatedAt">--:--:--</span>
+      <button id="logout-btn" class="mg-icon-btn" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+  </header>
+
+  <main class="mg-shell">
+    <!-- Alarm banner -->
+    <div id="mgAlarm" class="mg-alarm hidden">
+      <div class="mg-alarm__msg"><i id="mgAlarmIcon" class="fa-solid fa-circle-info"></i><span id="mgAlarmText">—</span></div>
+      <button class="mg-alarm__close" onclick="document.getElementById('mgAlarm').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="mg-grid">
+      <!-- LEFT COLUMN -->
+      <div class="mg-stack">
+        <!-- Hero demand card -->
+        <section class="mg-card mg-hero" id="mgHero">
+          <div class="mg-hero__top">
+            <span class="mg-badge safe" id="mgStatusBadge"><i class="fa-solid fa-shield-halved"></i><span id="mgStatusText">DEMAND SAFE</span></span>
+            <div class="mg-hero__countdown">
+              <i class="fa-regular fa-clock"></i>
+              Window: <b id="mgWindow">--:--</b> left
+            </div>
+          </div>
+
+          <div class="mg-hero__numbers">
+            <div class="mg-hero__num primary">
+              <span class="mg-label">Current</span>
+              <span class="mg-value"><span id="mgCurrent">--</span><span class="unit">kW</span></span>
+            </div>
+            <div class="mg-hero__num">
+              <span class="mg-label">Projected</span>
+              <span class="mg-value"><span id="mgProjected">--</span><span class="unit">kW</span></span>
+            </div>
+            <div class="mg-hero__num">
+              <span class="mg-label">Allowed</span>
+              <span class="mg-value"><span id="mgAllowed">--</span><span class="unit">kW</span></span>
+            </div>
+          </div>
+
+          <div class="mg-bar">
+            <div class="mg-bar__fill" id="mgBarFill"></div>
+            <div class="mg-bar__ticks">
+              <div class="mg-bar__tick" style="left:80%"></div>
+              <div class="mg-bar__tick" style="left:90%"></div>
+            </div>
+          </div>
+          <div class="mg-bar__legend">
+            <span>0%</span><span>80% caution</span><span>90% breach</span><span>100%</span>
+          </div>
+
+          <div class="mg-hero__foot">
+            <div class="item">
+              <span class="mg-label">Headroom</span>
+              <span class="mg-value" id="mgHeadroom">+-- <span class="unit">kW</span></span>
+            </div>
+            <div class="item">
+              <span class="mg-label">Correction needed</span>
+              <span class="mg-value" id="mgCorrection">0 <span class="unit">kW</span></span>
+            </div>
+            <div class="item">
+              <span class="mg-label">Next-window forecast</span>
+              <span class="mg-value" id="mgForecast">-- <span class="unit">kW</span></span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Power flow -->
+        <section class="mg-card">
+          <div class="mg-card__head">
+            <div class="mg-card__title"><i class="fa-solid fa-bolt-lightning"></i> Site Power Flow</div>
+            <span class="mg-card__sub" id="mgFlowTs">live</span>
+          </div>
+          <div class="mg-flow">
+            <div class="mg-flow__node solar">
+              <span class="mg-row"><span class="icon"><i class="fa-solid fa-sun"></i></span><span><span class="role">Solar</span><div class="name">PV</div></span></span>
+              <span class="v"><span id="mgFlowSolar">--</span> <span class="unit mg-mute" style="font-size:.65em">kW</span></span>
+            </div>
+            <div class="mg-flow__node bess">
+              <span class="mg-row"><span class="icon"><i class="fa-solid fa-battery-half"></i></span><span><span class="role">BESS</span><div class="name" id="mgFlowBessMode">Idle</div></span></span>
+              <span class="v"><span id="mgFlowBess">--</span> <span class="unit mg-mute" style="font-size:.65em">kW</span></span>
+            </div>
+            <div class="mg-flow__node grid">
+              <span class="mg-row"><span class="icon"><i class="fa-solid fa-plug"></i></span><span><span class="role">Grid</span><div class="name">Import</div></span></span>
+              <span class="v"><span id="mgFlowGrid">--</span> <span class="unit mg-mute" style="font-size:.65em">kW</span></span>
+            </div>
+            <div class="mg-flow__node load">
+              <span class="mg-row"><span class="icon"><i class="fa-solid fa-industry"></i></span><span><span class="role">Site Load</span><div class="name">Total</div></span></span>
+              <span class="v"><span id="mgFlowLoad">--</span> <span class="unit mg-mute" style="font-size:.65em">kW</span></span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="mg-stack">
+        <!-- Monthly demand -->
+        <section class="mg-card">
+          <div class="mg-card__head">
+            <div class="mg-card__title"><i class="fa-regular fa-calendar"></i> This Month's Demand</div>
+            <span class="mg-card__sub" id="mgMtdMonth">—</span>
+          </div>
+          <div class="mg-kpi__row">
+            <div><span class="mg-label">MTD Peak</span><div class="mg-value"><span id="mgMtdPeak">--</span><span class="unit">kW</span></div></div>
+            <div style="text-align:right"><span class="mg-label">Sanctioned</span><div class="mg-value"><span id="mgSanctioned">--</span><span class="unit">kW</span></div></div>
+          </div>
+          <div class="mg-bar"><div class="mg-bar__fill" id="mgMtdFill"></div></div>
+          <div class="mg-kpi__sub">
+            <span class="mg-mute">Demand exposure</span><span class="v red" id="mgExposure">—</span>
+            <span class="mg-mute">Breach events MTD</span><span class="v" id="mgBreachCount">0</span>
+          </div>
+        </section>
+
+        <!-- BESS -->
+        <section class="mg-card">
+          <div class="mg-card__head">
+            <div class="mg-card__title"><i class="fa-solid fa-battery-three-quarters"></i> Battery (BESS)</div>
+            <span class="mg-card__sub" id="mgBessMode">IDLE</span>
+          </div>
+          <div class="mg-spread mg-mt-sm">
+            <span class="mg-mute">State of Charge</span>
+            <span class="mg-value" style="font-size:1.4rem"><span id="mgSoc">--</span><span class="unit">%</span></span>
+          </div>
+          <div class="mg-soc mg-mt-sm">
+            <div class="mg-soc__fill" id="mgSocFill"></div>
+            <div class="mg-soc__floor" id="mgSocFloor" style="left:35%"></div>
+          </div>
+          <div class="mg-kpi__sub">
+            <span class="mg-mute">Discharge available</span><span class="v" id="mgDischargeAvail">— kWh</span>
+            <span class="mg-mute">Reserve floor</span><span class="v" id="mgReserveFloor">35%</span>
+          </div>
+        </section>
+
+        <!-- Tariff & Savings -->
+        <section class="mg-card" id="mgTariffCard">
+          <div class="mg-card__head">
+            <div class="mg-card__title"><i class="fa-solid fa-indian-rupee-sign"></i> Tariff & Savings</div>
+            <span class="mg-card__sub" id="mgCurrency">INR</span>
+          </div>
+          <div class="mg-kpi__sub" style="grid-template-columns: 1fr auto;">
+            <span class="mg-mute">BESS savings today</span><span class="v green" id="mgSavingsToday">—</span>
+            <span class="mg-mute">Demand charge rate</span><span class="v" id="mgChargeRate">—</span>
+            <span class="mg-mute">Projected demand charge</span><span class="v" id="mgProjCharge">—</span>
+            <span class="mg-mute">Breach cost if hit now</span><span class="v red" id="mgBreachCost">—</span>
+          </div>
+          <div id="mgTariffMissing" style="display:none; margin-top:.5rem;">
+            <a class="mg-link" href="/forrixguard-setup">Configure tariff →</a>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Device strip -->
+    <div class="mg-section-title">
+      <h2>Devices</h2>
+      <span class="mg-mute">Tap a card for technical detail</span>
+    </div>
+    <div id="mgDevStrip" class="mg-strip"></div>
+  </main>
+
+  <!-- Drawer -->
+  <div class="mg-drawer-bg" id="mgDrawerBg" onclick="mgCloseDrawer()"></div>
+  <aside class="mg-drawer" id="mgDrawer">
+    <div class="mg-drawer__head">
+      <div class="mg-card__title"><i class="fa-solid fa-microchip"></i> <span id="mgDrawerTitle">Device</span></div>
+      <button class="mg-icon-btn" onclick="mgCloseDrawer()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mg-drawer__body" id="mgDrawerBody"></div>
+  </aside>
+
+  <!-- Toast stack -->
+  <div class="mg-toasts" id="mgToasts"></div>
+
+  <script>
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try { await fetch('/api/logout', { method: 'POST' }); } finally { window.location.href = '/login'; }
+    });
+  </script>
+  <script src="/static/js/mdguard.js?v={{ APP_VERSION }}"></script>
+</body>
+</html>
